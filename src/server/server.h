@@ -45,7 +45,7 @@ public:
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
 
-    void listen(int port, int num_threads);
+    void init(int port, int num_threads);
     void stop();
     void spawn(Async<void> task);
     net::io_context& engine() { return ioc_; }

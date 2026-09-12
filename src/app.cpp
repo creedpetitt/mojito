@@ -40,7 +40,7 @@ void App::stop() {
     }
 }
 
-void App::listen(const int port) {
+void App::init(const int port) {
     if (state_ != AppState::Configuring) {
         throw std::logic_error("App::listen: App has already started listening or was stopped.");
     }
@@ -50,7 +50,7 @@ void App::listen(const int port) {
     Logger::instance().set_level(config_.log_level);
 
     try {
-        server_->listen(port, config_.threads);
+        server_->init(port, config_.threads);
     } catch (const std::exception& e) {
         state_ = AppState::Stopped;
         std::cerr << "[Blaze] FATAL: Could not start listener: " << e.what() << std::endl;

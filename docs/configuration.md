@@ -64,8 +64,6 @@ By default, Blaze logs to `stdout`. In production, you can redirect this to a fi
 app.log_to("server.log");
 ```
 
-> **Note on Lazy Logging**: To keep your workspace clean, Blaze uses "Lazy Logging." The log file will not be physically created on your disk until the first log message is actually generated. If no traffic hits your server, no file will appear.
-
 ---
 
 ## Lifecycle & Shutdown
@@ -115,3 +113,19 @@ int main() {
     app.listen(8080);
 }
 ```
+
+
+graph TD
+        subgraph App ["App (State: Configuring)"]
+            Router["router_ (empty)"]
+            MW["middleware_ (empty vector)"]
+            Config["config_ (threads=4, port=8080, etc.)"]
+            Dispatcher["dispatcher_"]
+            Server["server_ (State: Stopped)"]
+        end
+
+        Dispatcher -->|references| Router
+        Dispatcher -->|references| MW
+        Dispatcher -->|references| Config
+        Server -->|references| Dispatcher
+        Server -->|references| Config

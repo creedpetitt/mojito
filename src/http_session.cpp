@@ -29,9 +29,9 @@ namespace {
 
 Request make_request(http::request<http::string_body>&& req) {
     Request blaze_req;
-    blaze_req.method = std::string(req.method_string());
+    blaze_req.set_method(req.method_string());
     blaze_req.set_target(std::string_view(req.target().data(), req.target().size()));
-    blaze_req.body = std::move(req.body());
+    blaze_req.set_body(std::move(req.body()));
 
     for (const auto& field : req) {
         blaze_req.add_header(field.name_string(), field.value());

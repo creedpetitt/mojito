@@ -1,16 +1,18 @@
 /**
  * Example 01: Hello World
- * 
+ *
  * This example demonstrates the most basic Blaze application.
  * Concepts:
  * - App instance creation
+ * - Configuring the application
  * - Basic GET routing
  * - Using the Response object to send text
  * - Starting the server
  */
 
 #include <blaze/app.h>
-#include <iostream>
+#include <cstdio>
+#include <print>
 
 #include "../../include/blaze/config.h"
 
@@ -19,7 +21,7 @@ using namespace blaze;
 int main() {
 
     // Create and configure the application
-    auto cfg = ConfigBuilder()
+    auto cfg = blaze::ConfigBuilder()
         .server_name("HelloWorldApp/1.0")
         .log_level(LogLevel::DEBUG)
         .threads(8)
@@ -38,8 +40,8 @@ int main() {
 
     // Start the server on port 8080
     // This call is blocking and starts the internal thread pool
-    std::cout << "Starting server on http://localhost:8080" << std::endl;
-    app.listen(8080);
+    std::println("Starting server on http://localhost:8080");
+    app.init(8080);
 
     return 0;
 }

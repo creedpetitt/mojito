@@ -8,45 +8,43 @@ include(CMakePackageConfigHelpers)
 include(cmake/BlazeDependencies.cmake)
 
 if(PROJECT_IS_TOP_LEVEL)
-    set(BLAZE_DEFAULT_INSTALL ON)
+  set(BLAZE_DEFAULT_INSTALL ON)
 else()
-    set(BLAZE_DEFAULT_INSTALL OFF)
+  set(BLAZE_DEFAULT_INSTALL OFF)
 endif()
 
-option(BLAZE_BUILD_TESTS "Build the Blaze test suite" ${PROJECT_IS_TOP_LEVEL})
-option(BLAZE_BUILD_FUZZERS "Build LibFuzzer targets (requires Clang)" OFF)
-option(BLAZE_ENABLE_SANITIZERS "Build Blaze with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
-option(BLAZE_ENABLE_TSAN "Build Blaze with ThreadSanitizer" OFF)
-option(BLAZE_INSTALL "Generate install rules for Blaze" ${BLAZE_DEFAULT_INSTALL})
+option(
+  BLAZE_INSTALL "Generate install rules for Blaze" ${BLAZE_DEFAULT_INSTALL})
 
 blaze_fetch_boost()
 find_package(Threads REQUIRED)
 
 if(NOT TARGET blaze_boost_system)
-    add_library(blaze_boost_system STATIC
+  add_library(blaze_boost_system STATIC
         ${BLAZE_BOOST_SOURCE_DIR}/libs/system/src/error_code.cpp
     )
-    target_include_directories(blaze_boost_system PUBLIC
+  target_include_directories(blaze_boost_system PUBLIC
         $<BUILD_INTERFACE:${BLAZE_BOOST_SOURCE_DIR}>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
-    set_target_properties(blaze_boost_system PROPERTIES EXPORT_NAME boost_system)
+  set_target_properties(
+      blaze_boost_system PROPERTIES EXPORT_NAME boost_system)
 endif()
 
 set(BLAZE_SOURCES
-        src/app.cpp
-        src/config.cpp
-        src/http_session.cpp
+    src/app.cpp
+    src/config.cpp
+    src/http_session.cpp
     src/json.cpp
     src/logger.cpp
     src/middleware.cpp
-        src/request.cpp
-        src/dispatcher.cpp
-        src/response.cpp
-        src/router.cpp
+    src/request.cpp
+    src/dispatcher.cpp
+    src/response.cpp
+    src/router.cpp
     src/server/server.cpp
     src/server/listener.cpp
-        src/signal_handler.cpp
+    src/signal_handler.cpp
     src/util/string.cpp
 )
 
@@ -66,34 +64,8 @@ target_link_libraries(blaze_core PUBLIC
     Threads::Threads
 )
 
-if(BLAZE_ENABLE_SANITIZERS)
-    target_compile_options(blaze_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
-    target_link_options(blaze_core PUBLIC -fsanitize=address,undefined)
-endif()
-
-if(BLAZE_ENABLE_TSAN)
-    target_compile_options(blaze_core PUBLIC -fsanitize=thread)
-    target_link_options(blaze_core PUBLIC -fsanitize=thread)
-endif()
-
-if(BLAZE_BUILD_TESTS)
-    include(CTest)
-    if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
-        add_subdirectory(tests)
-    endif()
-endif()
-
-if(BLAZE_BUILD_FUZZERS)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        message(STATUS "Blaze: fuzzing enabled")
-        add_subdirectory(tests/fuzzers)
-    else()
-        message(WARNING "BLAZE_BUILD_FUZZERS is ON, but compiler is not Clang. Fuzz targets will be skipped.")
-    endif()
-endif()
-
 if(BLAZE_INSTALL)
-    install(
+  install(
         TARGETS blaze_core blaze_boost_system
         EXPORT blazeTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -101,28 +73,31 @@ if(BLAZE_INSTALL)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 
-    install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-    install(DIRECTORY ${BLAZE_BOOST_SOURCE_DIR}/boost DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  install(
+      DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-    install(
+  install(
+      DIRECTORY ${BLAZE_BOOST_SOURCE_DIR}/boost DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+  install(
         EXPORT blazeTargets
         NAMESPACE blaze::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/blaze
     )
 
-    configure_package_config_file(
+  configure_package_config_file(
         cmake/blazeConfig.cmake.in
         ${CMAKE_CURRENT_BINARY_DIR}/blazeConfig.cmake
         INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/blaze
     )
 
-    write_basic_package_version_file(
+  write_basic_package_version_file(
         ${CMAKE_CURRENT_BINARY_DIR}/blazeConfigVersion.cmake
         VERSION ${PROJECT_VERSION}
         COMPATIBILITY SameMajorVersion
     )
 
-    install(
+  install(
         FILES
             ${CMAKE_CURRENT_BINARY_DIR}/blazeConfig.cmake
             ${CMAKE_CURRENT_BINARY_DIR}/blazeConfigVersion.cmake

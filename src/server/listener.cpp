@@ -10,9 +10,8 @@ namespace blaze {
 Listener::Listener(
     net::io_context& ioc,
     const tcp::endpoint& endpoint,
-    AcceptHandler on_accept)
-    : ioc_(ioc), acceptor_(net::make_strand(ioc)), on_accept_(std::move(on_accept))
-{
+    AcceptHandler on_accept) : ioc_(ioc), acceptor_(net::make_strand(ioc)), on_accept_(std::move(on_accept)) {
+
     beast::error_code ec;
 
     acceptor_.open(endpoint.protocol(), ec);
@@ -28,13 +27,11 @@ Listener::Listener(
     if (ec) throw std::runtime_error("Acceptor listen failed: " + ec.message());
 }
 
-void Listener::run()
-{
+void Listener::run() {
     do_accept();
 }
 
-void Listener::do_accept()
-{
+void Listener::do_accept() {
     acceptor_.async_accept(
         net::make_strand(ioc_),
         beast::bind_front_handler(&Listener::on_accept, shared_from_this()));
@@ -43,17 +40,14 @@ void Listener::do_accept()
 void Listener::on_accept(const beast::error_code& ec, tcp::socket socket)
 {
     if (ec) {
-        if (ec == net::error::operation_aborted)
-        {
+        if (ec == net::error::operation_aborted) {
             return;
         }
 
-        if (ec != net::error::bad_descriptor && ec != net::error::invalid_argument)
-        {
+        if (ec != net::error::bad_descriptor && ec != net::error::invalid_argument) {
             std::cerr << "accept error: " << ec.message() << std::endl;
         }
-    } else
-    {
+    } else {
         on_accept_(std::move(socket));
     }
 
@@ -62,8 +56,7 @@ void Listener::on_accept(const beast::error_code& ec, tcp::socket socket)
     }
 }
 
-void Listener::stop()
-{
+void Listener::stop() {
     beast::error_code ec;
     acceptor_.close(ec);
 }

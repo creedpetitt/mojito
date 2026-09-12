@@ -4,7 +4,7 @@
  * This example demonstrates how to build custom middleware and use the Request Context.
  * Concepts:
  * - Custom middleware with the Next function
- * - Request-scoped context (Context<T>)
+ * - Request-scoped data
  * - Logging and timing
  */
 
@@ -37,16 +37,15 @@ int main() {
         // Generate a simple trace ID
         std::string trace_id = "trace-" + std::to_string(std::time(nullptr));
         
-        // Store it in the request context using Type Key (Automatic deduction)
-        req.set(trace_id);
+        req.set_state("trace_id", trace_id);
 
         co_await next();
         co_return;
     });
 
-    // 3. Handler using the Context
-    app.get("/", [](Context<std::string> trace_id) -> Async<Json> {
-        // Context<T> automatically retrieves the value from the request context
+    // 3. Handler reading request-scoped data explicitly
+    app.get("/", [](Request& req) -> Async<Json> {
+        auto trace_id = req.state<std::string>("trace_id").value_or("");
         co_return Json({
             {"message", "Middleware trace demo"},
             {"your_trace_id", trace_id}
@@ -54,7 +53,7 @@ int main() {
     });
 
     std::cout << "Middleware demo running on :8080" << std::endl;
-    app.listen(8080);
+    app.go(8080);
 
     return 0;
 }

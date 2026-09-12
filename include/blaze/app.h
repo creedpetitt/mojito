@@ -57,19 +57,18 @@ public:
     /**
      * @brief Access the current lifecycle state.
      */
-    AppState state() const { return state_; }
+    AppState view_state() const { return state_; }
 
     /**
      * @brief Access the application configuration.
      */
-    const Config& config() const { return config_; }
+    const Config& view_config() const { return config_; }
 
 
     /**
      * @brief Registers a GET route.
      *
-     * Body<T>, and Context<T>.
-     * The handler function supports Request&, Response&, Path<T>, Query<T>,
+     * The handler function supports Request&, const Request&, and Response&.
      *
      * @param path The URL path (e.g., "/users/:id").
      * @param handler The callback function or lambda.
@@ -110,7 +109,7 @@ public:
      * @param port The port to listen on.
      * @param num_threads Number of threads for the event loop (0 = auto-detect).
      */
-    void listen(int port);
+    void init(int port);
 
     /**
      * @brief Registers global middleware.
@@ -154,9 +153,6 @@ private:
 
                 if constexpr (std::is_convertible_v<InnerT, std::string>) {
                     res.send(result);
-                } else if constexpr (std::is_same_v<InnerT, Json>) {
-                    // Special handling for our JSON wrapper
-                    res.json(result);
                 } else {
                     // Generic JSON serialization for Models, Vectors, Maps, etc.
                     res.json(result);

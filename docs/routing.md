@@ -105,49 +105,10 @@ Choosing the right tool for JSON handling is key to balancing performance and fl
 | Feature | `Body<T>` (Static) | `req.json()` (Dynamic) |
 | :--- | :--- | :--- |
 | **Performance** | **Ultra-Fast**: Mapped at compile-time. | **Standard**: Parsed into a map-like structure. |
-| **Validation** | **Automatic**: Checks types and calls `validate()`. | **Manual**: You must check field existence/types. |
 | **Extraction** | **Typed**: Converts request data to your struct. | **Generic**: Work with raw JSON manually. |
 | **Best For** | Public APIs, DB Models, Strict Contracts. | Webhooks, Prototyping, Heterogeneous data. |
 
 ---
-
-## 3. Automatic Validation
-
-If your model has a `validate()` method, Blaze will automatically call it before your handler runs. To make this easier, Blaze provides a set of declarative helpers in the `blaze::v` namespace.
-
-```cpp
-#include <blaze/util/validation.h>
-
-struct Signup {
-    std::string email;
-    std::string password;
-    int age;
-
-    void validate() const {
-        v::required(email, "Email");
-        v::email(email);
-        v::min_len(password, 8, "Password");
-        v::range(age, 18, 120, "Age");
-    }
-};
-BLAZE_MODEL(Signup, email, password, age)
-
-app.post("/signup", [](Body<Signup> s) -> Async<void> {
-    // If we get here, the data is GUARANTEED to be valid!
-    co_return;
-});
-```
-
-### Available Helpers (`blaze::v`)
-| Helper | Description |
-| :--- | :--- |
-| `v::required(val, name)` | Throws if string is empty. |
-| `v::email(val, name)` | Validates email format via regex. |
-| `v::min_len(val, min, name)` | Validates minimum string length. |
-| `v::max_len(val, max, name)` | Validates maximum string length. |
-| `v::range(val, min, max, name)` | Validates numeric range (inclusive). |
-| `v::matches(val, regex, name)` | Validates against a custom `std::regex`. |
-| `v::is_true(val, name)` | Throws if boolean is false (useful for TOS). |
 
 ---
 
@@ -241,13 +202,7 @@ app.get("/manual", [](Request& req, Response& res) -> Async<void> {
 
 ---
 
-## 7. API Documentation
-
-Blaze no longer registers OpenAPI or Swagger routes in the core server. Keep API documentation as an external `openapi.yaml`, generated artifact, or a separate extension so routing stays focused on request dispatch.
-
----
-
-## 8. Error Handling
+## 7. Error Handling
 
 Blaze uses exceptions to handle HTTP errors. If you throw an `HttpError` (or any of its children) inside a handler, Blaze will automatically catch it and return the correct status code and a JSON error message to the client.
 

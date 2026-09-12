@@ -44,7 +44,7 @@ Middleware cors() {
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-        if (req.method == "OPTIONS") {
+        if (req.method() == "OPTIONS") {
             res.status(204).send("");
             co_return;
         }
@@ -59,7 +59,7 @@ Middleware cors(const std::string& origin, const std::string& methods, const std
         res.set_header("Access-Control-Allow-Methods", methods);
         res.set_header("Access-Control-Allow-Headers", headers);
 
-        if (req.method == "OPTIONS") {
+        if (req.method() == "OPTIONS") {
             res.status(204).send("");
             co_return;
         }
@@ -78,12 +78,12 @@ Middleware static_files(const std::string& root_dir, bool serve_index) {
     }
 
     return [abs_root, serve_index, cache](const Request& req, Response& res, auto next) -> Async<void> {
-        if (req.method != "GET") {
+        if (req.method() != "GET") {
             co_await next();
             co_return;
         }
 
-        const std::string decoded_path = util::url_decode(req.path);
+        const std::string decoded_path = util::url_decode(req.path());
         const fs::path requested_path = abs_root / decoded_path.substr(1);
 
         std::error_code ec;
@@ -135,11 +135,11 @@ Middleware static_files(const std::string& root_dir, bool serve_index) {
 
 Middleware limit_body_size(size_t max_bytes) {
     return [max_bytes](const Request& req, Response& res, auto next) -> Async<void> {
-        if (req.body.size() > max_bytes) {
+        if (req.body().size() > max_bytes) {
             res.status(413).json(Json{
                 {"error", "Request body too large"},
                 {"max_size", max_bytes},
-                {"received_size", req.body.size()}
+                {"received_size", req.body().size()}
             });
             co_return;
         }
@@ -157,7 +157,7 @@ Middleware rate_limit(int max_requests, int window_seconds) {
 
     return [max_requests, window_seconds, state](const Request& req, Response& res, auto next) -> Async<void> {
         std::string ip = "unknown";
-        if (const auto ip_ctx = req.get_opt<std::string>("client_ip")) {
+        if (const auto ip_ctx = req.state<std::string>("client_ip")) {
             ip = *ip_ctx;
         }
 

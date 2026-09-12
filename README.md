@@ -16,8 +16,6 @@
 - **Type-Safe Extraction**: Automatic injection of `Path<T>`, `Body<T>`, and `Query<T>`.
 - **Explicit Services**: Register and resolve shared services without hiding application wiring.
 - **Focused Middleware**: Rate limiting, CORS, static files, and request context.
-- **High-Efficiency WebSockets**: Scalable real-time communication.
-- **Automatic Validation**: Integrity checks via `validate()` hooks.
 
 ## Installation
 

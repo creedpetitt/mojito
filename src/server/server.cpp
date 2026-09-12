@@ -26,15 +26,14 @@ Server::~Server() {
     }
 }
 
-void Server::listen(const int port, int num_threads) {
+void Server::init(const int port, int num_threads) {
     ServerState expected = ServerState::Stopped;
     if (!state_.compare_exchange_strong(expected, ServerState::Starting)) {
         throw std::logic_error("Server::listen: Server is already running or stopping.");
     }
 
     try {
-        num_threads = resolve_thread_count(num_threads, config_.threads);
-
+        
         const auto address = net::ip::make_address("0.0.0.0");
         const auto endpoint = tcp::endpoint{address, static_cast<unsigned short>(port)};
 
@@ -96,18 +95,6 @@ void Server::stop() {
 
 void Server::spawn(Async<void> task) {
     boost::asio::co_spawn(ioc_.get_executor(), std::move(task), boost::asio::detached);
-}
-
-int Server::resolve_thread_count(const int requested, const int configured) {
-    if (requested > 0) {
-        return requested;
-    }
-    if (configured > 0) {
-        return configured;
-    }
-
-    const auto hardware_threads = std::thread::hardware_concurrency();
-    return hardware_threads == 0 ? 4 : static_cast<int>(hardware_threads);
 }
 
 void Server::run(const int num_threads) {

@@ -8,19 +8,19 @@
 
 namespace blaze {
 
-namespace {
-
-Async<void> not_found_handler(Request&, Response& resp) {
-    resp.status(404).send("404 Not Found\n");
-    co_return;
-}
-
-const Handler& not_found() {
-    static const Handler handler = not_found_handler;
-    return handler;
-}
-
-} // namespace
+    namespace {
+    
+        Async<void> not_found_handler(Request&, Response& resp) {
+            resp.status(404).send("404 Not Found\n");
+            co_return;
+        }
+        
+        const Handler& not_found() {
+            static const Handler handler = not_found_handler;
+            return handler;
+        }
+    
+    } // namespace
 
 Dispatcher::Dispatcher(
     const Router& router,
@@ -49,14 +49,13 @@ Async<Response> Dispatcher::handle(Request& req, const std::string_view client_i
 
     try {
         if (config_.expose_client_ip) {
-            req.set("client_ip", std::string(client_ip));
+            req.set_state("client_ip", std::string(client_ip));
         }
-        auto match = router_.match(req.method, req.path);
+        auto match = router_.match(req.method(), req.path());
 
         const Handler* handler = nullptr;
         if (match.has_value()) {
-            req.params = std::move(match->params);
-            req.path_values = std::move(match->path_values);
+            req.set_route_params(std::move(match->params));
             handler = match->handler;
         } else {
             handler = &not_found();
@@ -84,7 +83,7 @@ Async<Response> Dispatcher::handle(Request& req, const std::string_view client_i
 
     const auto end_time = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    Logger::instance().log_access(client_ip, req.method, req.path, status_code, duration);
+    Logger::instance().log_access(client_ip, req.method(), req.path(), status_code, duration);
 
     co_return res;
 }

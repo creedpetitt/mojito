@@ -63,18 +63,15 @@ std::vector<std::string> split(const std::string_view path) {
 bool match_segments(
     const std::vector<std::string>& route_segments,
     const std::vector<std::string_view>& request_segments,
-    std::unordered_map<std::string, std::string>& params,
-    std::vector<std::string>& path_values)
-{
+    std::unordered_map<std::string, std::string>& params) {
+        
     for (size_t i = 0; i < route_segments.size(); ++i) {
         const std::string& route_segment = route_segments[i];
         const std::string_view request_segment = request_segments[i];
 
         if (!route_segment.empty() && route_segment.front() == ':') {
             const std::string name = route_segment.substr(1);
-            std::string value = util::url_decode(request_segment);
-            params[name] = value;
-            path_values.push_back(std::move(value));
+            params[name] = util::url_decode(request_segment);
             continue;
         }
 
@@ -88,8 +85,10 @@ bool match_segments(
 
 } // namespace
  
-void Router::add_route(const std::string_view method, const std::string& path, Handler handler)
-{
+void Router::add_route(
+    const std::string_view method, 
+    const std::string& path, Handler handler) {
+        
     routes_.push_back({
         std::string(method),
         path,
@@ -100,8 +99,8 @@ void Router::add_route(const std::string_view method, const std::string& path, H
 
 std::optional<MatchedRoute> Router::match(
     const std::string_view method,
-    const std::string_view path) const
-{
+    const std::string_view path) const {
+        
     const auto request_path = path_without_query(path);
     const auto request_segments = split_view(request_path);
 
@@ -110,9 +109,8 @@ std::optional<MatchedRoute> Router::match(
         if (route.segments.size() != request_segments.size()) continue;
 
         std::unordered_map<std::string, std::string> params;
-        std::vector<std::string> path_values;
-        if (match_segments(route.segments, request_segments, params, path_values)) {
-            return MatchedRoute{&route.handler, std::move(params), std::move(path_values)};
+        if (match_segments(route.segments, request_segments, params)) {
+            return MatchedRoute{&route.handler, std::move(params)};
         }
     }
 
