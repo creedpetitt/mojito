@@ -154,7 +154,7 @@ private:
                 if constexpr (std::is_convertible_v<InnerT, std::string>) {
                     res.send(result);
                 } else {
-                    // Generic JSON serialization for Models, Vectors, Maps, etc.
+                    // JSON-compatible return values are serialized as response JSON.
                     res.json(result);
                 }
             } else {

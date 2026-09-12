@@ -3,10 +3,12 @@
 #include <blaze/header.h>
 #include <blaze/json.h>
 
+#include <concepts>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <initializer_list>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -27,8 +29,10 @@ public:
     Response& file(std::string path);
     Response& json(const Json& data);
     template<typename T>
-    Response& json(const T& data) {
-        return json(Json(data));
+        requires std::constructible_from<Json, T> &&
+                 (!std::same_as<std::remove_cvref_t<T>, Json>)
+    Response& json(T&& data) {
+        return json(Json(std::forward<T>(data)));
     }
     Response& json_raw(std::string_view body);
 

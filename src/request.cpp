@@ -2,8 +2,6 @@
 #include <blaze/request.h>
 #include <blaze/util/string.h>
 
-#include <boost/json.hpp>
-
 #include <algorithm>
 #include <cctype>
 
@@ -114,16 +112,7 @@ std::optional<std::string_view> Request::query(std::string_view key) const {
 }
 
 std::expected<Json, util::ParseError> Request::try_json() const {
-    boost::system::error_code ec;
-    auto value = boost::json::parse(body_, ec);
-    if (ec) {
-        return std::unexpected(util::ParseError{
-            util::ParseErrorCode::Invalid,
-            "Invalid JSON in request body: " + ec.message()
-        });
-    }
-
-    return Json(std::move(value));
+    return Json::parse(body_);
 }
 
 Json Request::json() const {

@@ -11,7 +11,6 @@
  */
 
 #include <blaze/app.h>
-#include <cstdio>
 #include <print>
 
 #include "../../include/blaze/config.h"
@@ -35,6 +34,59 @@ int main() {
     app.get("/", [](Response& res) -> Async<void> {
         // Send a plain text response
         res.send("Hello from Blaze!");
+        co_return;
+    });
+
+    app.get("/api/hello", []() -> Async<Json> {
+        co_return Json{
+            {"message", "Hello from Blaze"},
+            {"ok", true}
+        };
+    });
+
+    app.get("/api/users/:id", [](Request& req) -> Async<Json> {
+        const auto id = req.param<int>("id");
+        const auto verbose = req.query_or<bool>("verbose", false);
+
+        co_return Json{
+            {"id", id},
+            {"verbose", verbose},
+            {"roles", Json::array("admin", "editor")},
+            {"profile", Json{
+                {"active", true},
+                {"score", 42}
+            }}
+        };
+    });
+
+    app.post("/api/echo", [](Request& req) -> Async<Json> {
+        const auto body = req.json();
+        const auto name = body["name"].as<std::string>();
+        const auto age = body.try_get<int>("age").value_or(0);
+
+        co_return Json{
+            {"ok", true},
+            {"name", name},
+            {"age", age}
+        };
+    });
+
+    app.post("/api/echo-safe", [](Request& req, Response& res) -> Async<void> {
+        auto parsed = req.try_json();
+        if (!parsed) {
+            res.status(400).json({
+                {"error", "Bad Request"},
+                {"message", parsed.error().message}
+            });
+            co_return;
+        }
+
+        const auto name = parsed->try_get<std::string>("name").value_or("anonymous");
+        res.json({
+            {"ok", true},
+            {"name", name},
+            {"received", *parsed}
+        });
         co_return;
     });
 

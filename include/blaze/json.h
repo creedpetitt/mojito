@@ -1,125 +1,132 @@
 #pragma once
 
-#include <boost/json.hpp>
+#include <blaze/exceptions.h>
+#include <blaze/util/string.h>
+
+#include <concepts>
+#include <cstdint>
+#include <expected>
+#include <initializer_list>
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <memory>
-#include <variant>
-#include <optional>
+#include <type_traits>
+#include <utility>
 
 namespace blaze {
 
+namespace detail {
+template<typename>
+inline constexpr bool unsupported_json_as_v = false;
+}
+
 class Json {
 public:
-    enum class Type { 
-        NONE, 
-        BOOST_VAL
+    enum class Type {
+        Null,
+        Bool,
+        Int,
+        UInt,
+        Double,
+        String,
+        Array,
+        Object
     };
 
+    using Member = std::pair<std::string_view, Json>;
+
     Json();
-    explicit Json(boost::json::value v);
+    Json(std::nullptr_t);
+    Json(bool value);
+    Json(int value);
+    Json(unsigned int value);
+    Json(std::int64_t value);
+    Json(std::uint64_t value);
+    Json(double value);
+    Json(const char* value);
+    Json(std::string value);
+    Json(std::string_view value);
+    Json(std::initializer_list<Member> members);
 
-    // Generic constructor to allow Json({ ... }) syntax universally
-    template<typename T>
-    explicit Json(const T& value) : Json(boost::json::value_from(value)) {}
+    template<std::signed_integral T>
+        requires (!std::same_as<std::remove_cvref_t<T>, bool>)
+    Json(T value) : Json(static_cast<std::int64_t>(value)) {}
 
-    // Json({{"key", val}})
-    Json(std::initializer_list<std::pair<std::string_view, boost::json::value_ref>> list);
+    template<std::unsigned_integral T>
+        requires (!std::same_as<std::remove_cvref_t<T>, bool>)
+    Json(T value) : Json(static_cast<std::uint64_t>(value)) {}
 
-    // Helper to detect if T is a pair-like type compatible with our object constructor
-    template<typename T>
-    struct is_object_pair : std::false_type {};
+    Json(const Json& other);
+    Json(Json&& other);
+    Json& operator=(const Json& other);
+    Json& operator=(Json&& other);
+    ~Json();
 
-    template<typename K, typename V>
-    struct is_object_pair<std::pair<K, V>> : std::is_convertible<K, std::string_view> {};
+    static Json object(std::initializer_list<Member> members);
+    static Json array(std::initializer_list<Json> items);
 
-    // Array Constructor: Json({1, 2, 3})
-    // Enabled ONLY if T is NOT a pair compatible with the Object constructor
-    template<typename T, typename = std::enable_if_t<!is_object_pair<T>::value>>
-    Json(std::initializer_list<T> list) {
-        boost::json::array arr;
-        for(const auto& item : list) {
-            arr.push_back(boost::json::value_from(item));
-        }
-        data_.type = Type::BOOST_VAL;
-        data_.boost_ptr = std::make_shared<boost::json::value>(std::move(arr));
-    }
-    
     template<typename... Args>
     static Json array(Args&&... args) {
-        boost::json::array arr;
-        arr.reserve(sizeof...(args));
-        (arr.push_back(boost::json::value_from(std::forward<Args>(args))), ...);
-        return {boost::json::value(std::move(arr))};
+        return array({Json(std::forward<Args>(args))...});
     }
 
+    static std::expected<Json, util::ParseError> parse(std::string_view text);
+
+    Type type() const noexcept;
+    bool is_null() const noexcept;
+    bool is_bool() const noexcept;
+    bool is_number() const noexcept;
+    bool is_string() const noexcept;
+    bool is_array() const noexcept;
+    bool is_object() const noexcept;
+
     Json operator[](size_t idx) const;
-    Json operator[](const int idx) const { return (*this)[static_cast<size_t>(idx)]; }
     Json operator[](std::string_view key) const;
     Json operator[](const char* key) const { return (*this)[std::string_view(key)]; }
 
     bool has(std::string_view key) const;
+    size_t size() const noexcept;
+    bool empty() const noexcept { return size() == 0; }
+
+    void set(std::string_view key, Json value);
 
     template<typename T>
-    std::optional<T> try_get(const std::string_view key) const {
-        if (!has(key)) return std::nullopt;
-        // For now, we rely on as<T> being robust or implicit conversion
-        // Ideally we check if conversion is valid.
-        // Let's rely on existence first.
-        return (*this)[key].as<T>();
+    T as() const {
+        static_assert(detail::unsupported_json_as_v<T>, "Unsupported Json::as<T>() type.");
     }
 
     template<typename T>
-    void set(std::string_view key, T&& value) {
-        if (data_.type == Type::BOOST_VAL && data_.boost_ptr->is_object()) {
-            data_.boost_ptr->as_object().insert_or_assign(key, boost::json::value_from(std::forward<T>(value)));
+    std::optional<T> try_as() const {
+        try {
+            return as<T>();
+        } catch (const BadRequest&) {
+            return std::nullopt;
         }
     }
 
     template<typename T>
-    T as() const {
-        return boost::json::value_to<T>(value());
+    std::optional<T> try_get(std::string_view key) const {
+        return (*this)[key].template try_as<T>();
     }
 
     explicit operator std::string() const;
     explicit operator int() const;
 
-    explicit operator boost::json::value() const;
-
-    const boost::json::value& value() const;
-    boost::json::value move_value() const;
-
-    size_t size() const;
-    bool empty() const { return size() == 0; }
-    bool is_ok() const;
-
     std::string dump() const;
 
-    // Enable Boost.JSON serialization support for vector<blaze::Json>
-    friend void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, const Json& wrapper) {
-        if (wrapper.data_.type == Type::BOOST_VAL && wrapper.data_.boost_ptr) {
-            jv = *wrapper.data_.boost_ptr;
-        } else {
-            jv = nullptr;
-        }
-    }
-
-    friend Json tag_invoke(boost::json::value_to_tag<Json>, const boost::json::value& jv) {
-        return Json(jv);
-    }
-
 private:
-    struct Internal {
-        Type type = Type::NONE;
-        std::shared_ptr<boost::json::value> boost_ptr;
-    };
-
-    Internal data_;
-    explicit Json(Internal data) : data_(std::move(data)) {}
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
+template<> bool Json::as<bool>() const;
 template<> std::string Json::as<std::string>() const;
 template<> int Json::as<int>() const;
+template<> unsigned int Json::as<unsigned int>() const;
+template<> std::int64_t Json::as<std::int64_t>() const;
+template<> std::uint64_t Json::as<std::uint64_t>() const;
+template<> double Json::as<double>() const;
 template<> Json Json::as<Json>() const;
 
 } // namespace blaze
