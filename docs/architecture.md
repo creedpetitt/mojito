@@ -6,7 +6,7 @@ Blaze is engineered for high-concurrency workloads where I/O latency is the prim
 
 ## 1. The Async Core
 
-Blaze is built on top of **Boost.Asio** and C++20 **Coroutines**. Unlike traditional frameworks that use one thread per connection (which wastes memory and CPU), Blaze uses a small pool of worker threads to handle thousands of connections.
+Blaze is built on top of **Boost.Asio** and **Coroutines**. Unlike traditional frameworks that use one thread per connection (which wastes memory and CPU), Blaze uses a small pool of worker threads to handle thousands of connections.
 
 ### How it works:
 When a handler reaches a `co_await` point, the current function is suspended and its state is saved. The worker thread is then immediately freed to handle a different request. Once the awaited operation completes, the original function resumes exactly where it left off.
@@ -53,19 +53,6 @@ graph LR
     User --> Handler
     Logger --> Handler
 ```
-
----
-
-## 3. Typed JSON Mapping
-
-Blaze uses Boost.Describe to map your structs to and from JSON when you opt into `BLAZE_MODEL`.
-
-### The Metadata Pipeline:
-1.  **Definition**: You define a struct with `BLAZE_MODEL`.
-2.  **Inspection**: At compile-time, Blaze generates a list of fields and types.
-3.  **Mapping**: 
-    *   **JSON**: Blaze maps `struct.name` to `"name": "value"`.
-4.  **Low Overhead**: The field list is known at compile time.
 
 ---
 

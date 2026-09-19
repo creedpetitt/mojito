@@ -58,8 +58,8 @@ boost::asio::awaitable<void> write_response(
     Stream& stream,
     Response& blaze_res,
     const bool keep_alive,
-    const unsigned version = 11
-) {
+    const unsigned version = 11) {
+        
     if (blaze_res.is_file()) {
         beast::error_code ec;
         http::file_body::value_type body;

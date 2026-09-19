@@ -20,20 +20,20 @@ bool header_name_equal(const std::string_view lhs, const std::string_view rhs) {
 
 std::string_view http_to_msg(const int status) {
     switch (status) {
-    case 200: return "OK";
-    case 201: return "Created";
-    case 202: return "Accepted";
-    case 204: return "No Content";
-    case 301: return "Moved Permanently";
-    case 302: return "Found";
-    case 400: return "Bad Request";
-    case 401: return "Unauthorized";
-    case 403: return "Forbidden";
-    case 404: return "Not Found";
-    case 413: return "Payload Too Large";
-    case 429: return "Too Many Requests";
-    case 500: return "Internal Server Error";
-    default: return "Unknown";
+        case 200: return "OK";
+        case 201: return "Created";
+        case 202: return "Accepted";
+        case 204: return "No Content";
+        case 301: return "Moved Permanently";
+        case 302: return "Found";
+        case 400: return "Bad Request";
+        case 401: return "Unauthorized";
+        case 403: return "Forbidden";
+        case 404: return "Not Found";
+        case 413: return "Payload Too Large";
+        case 429: return "Too Many Requests";
+        case 500: return "Internal Server Error";
+        default: return "Unknown";
     }
 }
 
