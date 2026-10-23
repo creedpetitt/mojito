@@ -33,18 +33,6 @@ namespace blaze {
     }
 
     ConfigBuilder&
-    ConfigBuilder::log_path(const std::string_view path) {
-        config_.log_path = path;
-        return *this;
-    }
-
-    ConfigBuilder&
-    ConfigBuilder::log_level(const LogLevel log_level) {
-        config_.log_level = log_level;
-        return *this;
-    }
-
-    ConfigBuilder&
     ConfigBuilder::server_name(const std::string_view name) {
         config_.server_name = name;
         return *this;
@@ -57,6 +45,6 @@ namespace blaze {
     }
 
     Config ConfigBuilder::build() {
-        return std::move(config_);
+        return config_;
     }
 } // namespace blaze

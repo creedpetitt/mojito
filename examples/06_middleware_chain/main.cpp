@@ -5,12 +5,15 @@
  * Concepts:
  * - Custom middleware with the Next function
  * - Request-scoped data
- * - Logging and timing
+ * - Request timing
  */
 
 #include <blaze/app.h>
+#include <blaze/middleware.h>
 #include <chrono>
+#include <ctime>
 #include <iostream>
+#include <string>
 
 using namespace blaze;
 
@@ -53,7 +56,7 @@ int main() {
     });
 
     std::cout << "Middleware demo running on :8080" << std::endl;
-    app.go(8080);
+    app.init();
 
     return 0;
 }

@@ -24,15 +24,6 @@ public:
         Handler handler;
     };
 
-    Router() = default;
-    ~Router() = default;
-
-    Router(Router&&) noexcept = default;
-    Router& operator=(Router&&) noexcept = default;
-
-    Router(const Router&) = delete;
-    Router& operator=(const Router&) = delete;
-
     void add_route(std::string_view method, const std::string& path, Handler handler);
 
     std::optional<MatchedRoute> match(std::string_view method, std::string_view path) const;

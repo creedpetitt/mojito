@@ -16,7 +16,7 @@ public:
     SignalHandler(net::io_context& ioc, std::function<void(int)> on_signal);
 
     void start();
-    void cancel();
+    void cancel() noexcept;
 };
 
 } // namespace blaze

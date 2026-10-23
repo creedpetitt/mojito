@@ -15,8 +15,8 @@ namespace http = beast::http;
 namespace net = boost::asio;
 using tcp = boost::asio::ip::tcp;
 
-namespace blaze
-{
+namespace blaze {
+    
     class Dispatcher;
 
     template <class Stream>

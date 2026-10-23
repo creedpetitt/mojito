@@ -36,8 +36,6 @@ set(BLAZE_SOURCES
     src/config.cpp
     src/http_session.cpp
     src/json.cpp
-    src/logger.cpp
-    src/middleware.cpp
     src/request.cpp
     src/dispatcher.cpp
     src/response.cpp
@@ -77,7 +75,8 @@ if(BLAZE_INSTALL)
       DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
   install(
-      DIRECTORY ${BLAZE_BOOST_SOURCE_DIR}/boost DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+      DIRECTORY ${BLAZE_BOOST_SOURCE_DIR}/boost 
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
   install(
         EXPORT blazeTargets

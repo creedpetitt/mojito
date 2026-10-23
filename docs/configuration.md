@@ -39,11 +39,8 @@ int main() {
 
 ---
 
-## Logging
 
-Blaze uses an asynchronous logger that processes messages in a background thread to prevent blocking your high-performance request handlers.
 
-### Log Levels
 
 You can set the minimum severity level using `.log_level(LogLevel)`. Available levels are:
 *   `LogLevel::DEBUG`: Verbose output for development.

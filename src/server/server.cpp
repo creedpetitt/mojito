@@ -3,11 +3,13 @@
 #include "../http_session.h"
 #include "../dispatcher.h"
 #include "../signal_handler.h"
-#include <blaze/logger.h>
 
 #include <cstdio>
-#include <stdexcept>
+#include <exception>
+#include <mutex>
+#include <thread>
 #include <utility>
+#include <vector>
 
 namespace blaze {
 
@@ -19,21 +21,10 @@ Server::Server(
 
 Server::~Server() {
     stop();
-    for (auto& thread : threads_) {
-        if (thread.joinable()) {
-            thread.join();
-        }
-    }
 }
 
-void Server::init(const int port, int num_threads) {
-    ServerState expected = ServerState::Stopped;
-    if (!state_.compare_exchange_strong(expected, ServerState::Starting)) {
-        throw std::logic_error("Server::listen: Server is already running or stopping.");
-    }
-
+void Server::init(const int port, const int num_threads, std::function<void()> request_stop) {
     try {
-        
         const auto address = net::ip::make_address("0.0.0.0");
         const auto endpoint = tcp::endpoint{address, static_cast<unsigned short>(port)};
 
@@ -41,7 +32,7 @@ void Server::init(const int port, int num_threads) {
             ioc_,
             endpoint,
             [this](tcp::socket socket) {
-                if (state_.load() != ServerState::Running) {
+                if (ioc_.stopped()) {
                     boost::system::error_code ec;
                     socket.close(ec);
                     return;
@@ -54,68 +45,79 @@ void Server::init(const int port, int num_threads) {
             });
         listener_->run();
 
-        signals_ = std::make_unique<SignalHandler>(ioc_, [this](const int signal_number) {
+        signals_ = std::make_unique<SignalHandler>(ioc_, [request_stop = std::move(request_stop)](const int signal_number) {
             std::printf("[Blaze] Received signal %d, stopping...\n", signal_number);
-            stop();
+            request_stop();
         });
         signals_->start();
 
-        expected = ServerState::Starting;
-        if (!state_.compare_exchange_strong(expected, ServerState::Running)) {
-            listener_->stop();
-            return;
-        }
-
         run(num_threads);
     } catch (...) {
-        state_.store(ServerState::Stopped);
+        cleanup();
         throw;
     }
+    cleanup();
 }
 
-void Server::stop() {
-    ServerState expected = ServerState::Running;
-    if (!state_.compare_exchange_strong(expected, ServerState::Stopping)) {
-        if (state_.load() == ServerState::Starting) {
-            state_.store(ServerState::Stopping);
-        } else {
-            return;
-        }
-    }
+void Server::stop() noexcept {
+    // Safe from any thread, including before run(). Never restart this context:
+    // a shutdown request made during startup must remain effective.
+    ioc_.stop();
+}
 
+void Server::cleanup() noexcept {
+    // Called by init() only after run() has joined every worker, or when
+    // startup failed before any workers existed.
+    stop();
     if (signals_) {
         signals_->cancel();
+        signals_.reset();
     }
     if (listener_) {
         listener_->stop();
+        listener_.reset();
     }
-    ioc_.stop();
-    state_.store(ServerState::Stopped);
 }
 
 void Server::spawn(Async<void> task) {
-    boost::asio::co_spawn(ioc_.get_executor(), std::move(task), boost::asio::detached);
+    net::co_spawn(ioc_.get_executor(), std::move(task), net::detached);
 }
 
 void Server::run(const int num_threads) {
-    threads_.clear();
-    threads_.reserve(num_threads > 0 ? static_cast<size_t>(num_threads - 1) : 0);
+    std::mutex failure_mutex;
+    std::exception_ptr failure;
 
-    for (int i = 1; i < num_threads; ++i) {
-        threads_.emplace_back([this] {
+    auto run_loop = [&] {
+        try {
             ioc_.run();
-        });
-    }
-
-    ioc_.run();
-
-    for (auto& thread : threads_) {
-        if (thread.joinable()) {
-            thread.join();
+        } catch (...) {
+            {
+                std::lock_guard lock(failure_mutex);
+                if (!failure) {
+                    failure = std::current_exception();
+                }
+            }
+            stop();
         }
+    };
+
+    std::vector<std::jthread> workers;
+    try {
+        workers.reserve(num_threads > 1 ? static_cast<size_t>(num_threads - 1) : 0);
+        for (int i = 1; i < num_threads; ++i) {
+            workers.emplace_back(run_loop);
+        }
+
+        run_loop();
+    } catch (...) {
+        stop();
+        throw;
     }
-    threads_.clear();
-    state_.store(ServerState::Stopped);
+
+    workers.clear(); // Join before reading failure or cleaning up server objects.
+    if (failure) {
+        std::rethrow_exception(failure);
+    }
 }
 
 } // namespace blaze

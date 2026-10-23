@@ -27,7 +27,7 @@ public:
     Listener(net::io_context& ioc, const tcp::endpoint& endpoint, AcceptHandler on_accept);
 
     void run();
-    void stop();
+    void stop() noexcept;
 
 private:
     void do_accept();

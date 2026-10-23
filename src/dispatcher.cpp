@@ -1,9 +1,7 @@
 #include "dispatcher.h"
 
 #include <blaze/exceptions.h>
-#include <blaze/logger.h>
 
-#include <chrono>
 #include <utility>
 
 namespace blaze {
@@ -43,9 +41,7 @@ Async<void> Dispatcher::run_middleware(
 }
 
 Async<Response> Dispatcher::handle(Request& req, const std::string_view client_ip, const bool keep_alive) const {
-    const auto start_time = std::chrono::steady_clock::now();
     Response res;
-    int status_code{};
 
     try {
         if (config_.expose_client_ip) {
@@ -62,28 +58,20 @@ Async<Response> Dispatcher::handle(Request& req, const std::string_view client_i
         }
 
         co_await run_middleware(0, req, res, *handler);
-        status_code = res.get_status();
     } catch (const HttpError& e) {
         res.status(e.status()).json({
             {"error", "HTTP Error"},
             {"message", e.what()}
         });
-        status_code = e.status();
     } catch (const std::exception& e) {
         res.status(500).json({
             {"error", "Internal Server Error"},
             {"message", e.what()}
         });
-        status_code = 500;
-        Logger::instance().log_error(std::string("Exception in handle_request: ") + e.what());
     }
 
     res.header("Connection", keep_alive ? "keep-alive" : "close");
     res.header("Server", config_.server_name);
-
-    const auto end_time = std::chrono::steady_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    Logger::instance().log_access(client_ip, req.method(), req.path(), status_code, duration);
 
     co_return res;
 }

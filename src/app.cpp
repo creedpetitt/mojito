@@ -25,38 +25,43 @@ void App::spawn(Async<void> task) const {
     server_->spawn(std::move(task));
 }
 
-const Router& App::get_router() const {
-    check_configuring("Cannot access mutable router");
-    return router_;
-}
+void App::stop() noexcept {
+    auto current = state_.load();
+    for (;;) {
+        if (current == AppState::Stopping || current == AppState::Stopped) {
+            return;
+        }
 
-void App::stop() {
-    if (state_ == AppState::Running) {
-        state_ = AppState::Stopping;
-        server_->stop();
-    } else if (state_ == AppState::Configuring) {
-        state_ = AppState::Stopped;
-        server_->stop();
+        const auto next = current == AppState::Configuring
+            ? AppState::Stopped
+            : AppState::Stopping;
+
+        if (state_.compare_exchange_weak(current, next)) {
+            if (next == AppState::Stopping) {
+                server_->stop();
+            }
+            return;
+        }
     }
 }
 
-void App::init(const int port) {
-    if (state_ != AppState::Configuring) {
-        throw std::logic_error("App::listen: App has already started listening or was stopped.");
+void App::init() {
+    auto expected = AppState::Configuring;
+    if (!state_.compare_exchange_strong(expected, AppState::Running)) {
+        throw std::logic_error("App::init: App has already started or was stopped.");
     }
-    state_ = AppState::Running;
-
-    Logger::instance().configure(config_.log_path);
-    Logger::instance().set_level(config_.log_level);
 
     try {
-        server_->init(port, config_.threads);
+        server_->init(config_.port, config_.threads, [this] { stop(); });
     } catch (const std::exception& e) {
-        state_ = AppState::Stopped;
-        std::cerr << "[Blaze] FATAL: Could not start listener: " << e.what() << std::endl;
+        state_.store(AppState::Stopped);
+        std::cerr << "[Blaze] FATAL: Application execution failed: " << e.what() << std::endl;
+        throw;
+    } catch (...) {
+        state_.store(AppState::Stopped);
         throw;
     }
-    state_ = AppState::Stopped;
+    state_.store(AppState::Stopped);
 }
 
 void App::use(const Middleware &mw) {

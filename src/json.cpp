@@ -1,5 +1,4 @@
 #include <blaze/json.h>
-
 #include <boost/json/src.hpp>
 
 #include <limits>

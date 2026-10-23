@@ -72,9 +72,7 @@ For a full list of settings and best practices, see the **[Configuration Guide](
 
 ---
 
-### Logging
 
-Blaze features an asynchronous, thread-safe logger that won't slow down your request handling. You can configure the destination and the detail level.
 
 ```cpp
 int main() {

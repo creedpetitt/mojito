@@ -20,11 +20,10 @@ using namespace blaze;
 int main() {
 
     // Create and configure the application
-    auto cfg = blaze::ConfigBuilder()
+    blaze::Config cfg = blaze::ConfigBuilder()
         .server_name("HelloWorldApp/1.0")
-        .log_level(LogLevel::DEBUG)
         .threads(8)
-        .log_path("/dev/null")
+        .port(8080)
         .build();
 
     App app{cfg};
@@ -93,7 +92,7 @@ int main() {
     // Start the server on port 8080
     // This call is blocking and starts the internal thread pool
     std::println("Starting server on http://localhost:8080");
-    app.init(8080);
+    app.init();
 
     return 0;
 }

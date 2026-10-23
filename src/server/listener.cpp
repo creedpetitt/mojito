@@ -56,7 +56,7 @@ void Listener::on_accept(const beast::error_code& ec, tcp::socket socket)
     }
 }
 
-void Listener::stop() {
+void Listener::stop() noexcept {
     beast::error_code ec;
     acceptor_.close(ec);
 }

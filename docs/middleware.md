@@ -32,7 +32,6 @@ app.use([](Request& req, Response& res, Next next) -> Async<void> {
 Register middleware that applies to your entire application using `app.use()`.
 
 ```cpp
-app.use(middleware::logger());      // Logs every request
 app.use(middleware::cors());        // Enables Cross-Origin Resource Sharing
 app.use(middleware::static_files("public")); // Serves assets from the 'public' folder
 ```

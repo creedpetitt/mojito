@@ -1,6 +1,7 @@
 #pragma once
 
 #include <blaze/config.h>
+#include <blaze/middleware.h>
 #include <blaze/request.h>
 #include <blaze/response.h>
 #include <blaze/router.h>

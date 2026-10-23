@@ -9,6 +9,7 @@ namespace blaze {
  * @brief Base class for all HTTP-related exceptions in Blaze.
  */
 class HttpError : public std::runtime_error {
+private:
     int status_code_;
 public:
     HttpError(const int status, const std::string& msg)

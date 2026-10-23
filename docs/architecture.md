@@ -40,7 +40,6 @@ Blaze keeps services explicit. The app owns long-lived shared services, and each
 ```mermaid
 graph LR
     subgraph AppContainer [Application Container]
-        Logger[Logger Service]
         Auth[Auth Service]
     end
 
@@ -51,9 +50,7 @@ graph LR
 
     Auth --> Handler[Route Handler]
     User --> Handler
-    Logger --> Handler
 ```
-
 ---
 
 ## 4. Security by Default

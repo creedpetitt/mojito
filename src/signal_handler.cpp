@@ -18,8 +18,9 @@ void SignalHandler::start() {
     });
 }
 
-void SignalHandler::cancel() {
-    signals_.cancel();
+void SignalHandler::cancel() noexcept {
+    boost::system::error_code ec;
+    (void)signals_.cancel(ec);
 }
 
 } // namespace blaze

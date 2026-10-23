@@ -1,14 +1,12 @@
 #pragma once
 
 #include <blaze/config.h>
-#include <blaze/router.h>
+#include <blaze/async.h>
 
 #include <boost/asio.hpp>
 
-#include <atomic>
+#include <functional>
 #include <memory>
-#include <thread>
-#include <vector>
 
 namespace blaze {
 
@@ -18,22 +16,12 @@ class Listener;
 class Dispatcher;
 class SignalHandler;
 
-enum class ServerState {
-    Stopped,
-    Starting,
-    Running,
-    Stopping
-};
-
 class Server {
     Dispatcher& dispatcher_;
     const Config& config_;
     net::io_context ioc_;
     std::shared_ptr<Listener> listener_;
     std::unique_ptr<SignalHandler> signals_;
-    std::vector<std::thread> threads_;
-
-    std::atomic<ServerState> state_{ServerState::Stopped};
 
 public:
     Server(
@@ -45,16 +33,15 @@ public:
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
 
-    void init(int port, int num_threads);
-    void stop();
+    // App enforces single startup and owns the shutdown-state transitions.
+    void init(int port, int num_threads, std::function<void()> request_stop);
+    void stop() noexcept;
     void spawn(Async<void> task);
     net::io_context& engine() { return ioc_; }
 
-    ServerState state() const { return state_.load(); }
-
 private:
-    static int resolve_thread_count(int requested, int configured);
     void run(int num_threads);
+    void cleanup() noexcept;
 };
 
 } // namespace blaze

@@ -1,11 +1,12 @@
 #pragma once
 
 #include <blaze/router.h>
-#include <blaze/logger.h>
+#include <blaze/middleware.h>
 #include <blaze/injector.h>
 #include <blaze/json.h>
 #include <blaze/config.h>
 
+#include <atomic>
 #include <functional>
 #include <vector>
 #include <memory>
@@ -21,7 +22,7 @@ class Dispatcher;
  */
 enum class AppState {
     Configuring,
-    Running,
+    Running, // Startup or event processing is underway; not a readiness signal.
     Stopping,
     Stopped
 };
@@ -31,6 +32,9 @@ enum class AppState {
  * 
  * The App class manages the internal Boost.Asio engine, application services,
  * and HTTP routing.
+ * Configure routes and middleware on one thread before calling init().
+ * stop() and view_state() may be called from other threads. The App must
+ * outlive init() and every concurrent public call.
  */
 class App {
 private:
@@ -39,7 +43,7 @@ private:
     std::vector<Middleware> middleware_;
     std::unique_ptr<Dispatcher> dispatcher_;
     std::unique_ptr<Server> server_;
-    AppState state_{AppState::Configuring};
+    std::atomic<AppState> state_{AppState::Configuring};
 
 public:
     App();
@@ -49,15 +53,17 @@ public:
     ~App();
 
     /**
-     * @brief Stops the application.
-     * Closes the listener and stops the event loop.
+     * @brief Requests immediate shutdown without waiting for workers.
+     * init() returns after workers finish and listener/signal cleanup completes.
+     * In-flight responses are not drained. Pending operations are released
+     * when the App is destroyed.
      */
-    void stop();
+    void stop() noexcept;
 
     /**
      * @brief Access the current lifecycle state.
      */
-    AppState view_state() const { return state_; }
+    AppState view_state() const noexcept { return state_.load(); }
 
     /**
      * @brief Access the application configuration.
@@ -104,40 +110,20 @@ public:
     void spawn(Async<void> task) const;
 
     /**
-     * @brief Starts the HTTP server on the specified port.
-     *
-     * @param port The port to listen on.
-     * @param num_threads Number of threads for the event loop (0 = auto-detect).
+     * @brief Starts the HTTP server once and blocks until shutdown completes.
      */
-    void init(int port);
+    void init();
 
     /**
      * @brief Registers global middleware.
      */
     void use(const Middleware &mw);
 
-    /**
-     * @brief Auto-registers multiple controllers.
-     * Requires static void register_routes(App& app) in each controller.
-     */
-    template<typename... Controllers>
-    void register_controllers() {
-        ensure_configuring("Cannot register controllers");
-        (Controllers::register_routes(*this), ...);
-    }
-
-    /** @brief Access the internal router. */
-    const Router& get_router() const;
-
 private:
     void ensure_configuring(const std::string& action) const {
-        if (state_ != AppState::Configuring) {
-            throw std::logic_error(action + ": cannot mutate app once it has started listening.");
+        if (state_.load() != AppState::Configuring) {
+            throw std::logic_error(action + ": app is no longer configuring.");
         }
-    }
-
-    void check_configuring(const std::string& action) const {
-        ensure_configuring(action);
     }
 
     // Takes lambda and converts it into a standard (Request, Response) handler
@@ -154,7 +140,6 @@ private:
                 if constexpr (std::is_convertible_v<InnerT, std::string>) {
                     res.send(result);
                 } else {
-                    // JSON-compatible return values are serialized as response JSON.
                     res.json(result);
                 }
             } else {
