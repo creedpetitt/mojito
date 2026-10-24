@@ -11,6 +11,8 @@
 #include <tuple>
 #include <utility>
 
+namespace net = boost::asio;
+
 namespace blaze {
 
 template<class Stream>
@@ -111,8 +113,8 @@ boost::asio::awaitable<void> handle_session(
     Request req,
     const std::string_view client_ip,
     bool keep_alive,
-    const unsigned version)
-{
+    const unsigned version) {
+        
     Response blaze_res;
     bool error_occurred = false;
     std::optional<std::pair<http::status, std::string>> pending_error;
@@ -148,9 +150,9 @@ boost::asio::awaitable<void> handle_session(
     }
 
     if (error_occurred || !keep_alive) {
-        self->do_shutdown();
+        self->shutdown_session();
     } else {
-        self->do_read();
+        self->start_read();
     }
 }
 
@@ -170,28 +172,31 @@ template<class Stream>
 void HttpSession<Stream>::run() {
     net::dispatch(
         stream_.get_executor(),
-        beast::bind_front_handler(&HttpSession::do_read, this->shared_from_this()));
+        beast::bind_front_handler(&HttpSession::start_read, this->shared_from_this()));
 }
 
 template<class Stream>
-void HttpSession<Stream>::do_read() {
+void HttpSession<Stream>::start_read() {
     parser_.emplace();
+
+    // Set body limit
     parser_->body_limit(config_.max_body_size);
 
+    // Set connection expiration
     beast::get_lowest_layer(stream_).expires_after(
         std::chrono::seconds(config_.timeout_seconds)
     );
 
     http::async_read(stream_, buffer_, *parser_,
-        beast::bind_front_handler(&HttpSession::on_read, this->shared_from_this()));
+        beast::bind_front_handler(&HttpSession::read_bytes, this->shared_from_this()));
 }
 
 template<class Stream>
-void HttpSession<Stream>::on_read(const beast::error_code& ec, std::size_t bytes_transferred) {
+void HttpSession<Stream>::read_bytes(const beast::error_code& ec, std::size_t bytes_transferred) {
     boost::ignore_unused(bytes_transferred);
 
     if (ec == http::error::end_of_stream) {
-        do_shutdown();
+        shutdown_session();
         return;
     }
 
@@ -201,12 +206,13 @@ void HttpSession<Stream>::on_read(const beast::error_code& ec, std::size_t bytes
             return;
         }
 
-        if (ec != net::error::connection_reset && ec != net::error::eof && ec != beast::error::timeout && ec != net::error::operation_aborted) {
+        if (ec != net::error::connection_reset && ec != net::error::eof && 
+            ec != beast::error::timeout && ec != net::error::operation_aborted) {
             std::cerr << "Request Parse Error: " << ec.message() << "\n";
             send_error_response(http::status::bad_request, "Bad Request");
             return;
         }
-        do_shutdown();
+        shutdown_session();
         return;
     }
 
@@ -230,7 +236,7 @@ void HttpSession<Stream>::on_read(const beast::error_code& ec, std::size_t bytes
 }
 
 template<class Stream>
-void HttpSession<Stream>::do_shutdown() {
+void HttpSession<Stream>::shutdown_session() {
     beast::get_lowest_layer(stream_).
         expires_after(std::chrono::seconds(30));
     StreamTraits<Stream>::shutdown(stream_);
@@ -254,7 +260,7 @@ void HttpSession<Stream>::send_error_response(http::status status, const std::st
     res->prepare_payload();
 
     http::async_write(stream_, *res, [self = this->shared_from_this(), res](beast::error_code, std::size_t) {
-        self->do_shutdown();
+        self->shutdown_session();
     });
 }
 

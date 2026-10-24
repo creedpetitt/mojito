@@ -30,7 +30,7 @@ public:
     void stop() noexcept;
 
 private:
-    void do_accept();
+    void accept_connection();
     void on_accept(const beast::error_code& ec, tcp::socket socket);
 };
 

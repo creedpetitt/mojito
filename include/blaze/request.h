@@ -1,7 +1,7 @@
 #pragma once
 
-#include <blaze/header.h>
 #include <blaze/json.h>
+#include <blaze/header.h>
 #include <blaze/util/string.h>
 
 #include <any>

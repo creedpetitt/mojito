@@ -1,9 +1,11 @@
 #include "server.h"
+#include "boost/beast/core/tcp_stream.hpp"
 #include "listener.h"
 #include "../http_session.h"
 #include "../dispatcher.h"
 #include "../signal_handler.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <exception>
 #include <mutex>
@@ -23,10 +25,9 @@ Server::~Server() {
     stop();
 }
 
-void Server::init(const int port, const int num_threads, std::function<void()> request_stop) {
+void Server::init(const uint16_t port, const int num_threads, std::function<void()> request_stop) {
     try {
-        const auto address = net::ip::make_address("0.0.0.0");
-        const auto endpoint = tcp::endpoint{address, static_cast<unsigned short>(port)};
+        const auto endpoint = tcp::endpoint{tcp::v4(), port};
 
         listener_ = std::make_shared<Listener>(
             ioc_,
@@ -37,7 +38,8 @@ void Server::init(const int port, const int num_threads, std::function<void()> r
                     socket.close(ec);
                     return;
                 }
-                auto session = std::make_shared<Session>(
+
+                auto session = std::make_shared<HttpSession<beast::tcp_stream>>(
                     dispatcher_,
                     config_,
                     beast::tcp_stream(std::move(socket)));
@@ -45,12 +47,13 @@ void Server::init(const int port, const int num_threads, std::function<void()> r
             });
         listener_->run();
 
-        signals_ = std::make_unique<SignalHandler>(ioc_, [request_stop = std::move(request_stop)](const int signal_number) {
+        signals_ = std::make_unique<SignalHandler>
+            (ioc_, [request_stop = std::move(request_stop)](const int signal_number) {
             std::printf("[Blaze] Received signal %d, stopping...\n", signal_number);
             request_stop();
         });
         signals_->start();
-
+        
         run(num_threads);
     } catch (...) {
         cleanup();
@@ -60,14 +63,10 @@ void Server::init(const int port, const int num_threads, std::function<void()> r
 }
 
 void Server::stop() noexcept {
-    // Safe from any thread, including before run(). Never restart this context:
-    // a shutdown request made during startup must remain effective.
     ioc_.stop();
 }
 
 void Server::cleanup() noexcept {
-    // Called by init() only after run() has joined every worker, or when
-    // startup failed before any workers existed.
     stop();
     if (signals_) {
         signals_->cancel();

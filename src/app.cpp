@@ -1,7 +1,7 @@
 #include <blaze/app.h>
 
 #include <memory>
-#include <iostream>
+#include <functional>
 
 #include "dispatcher.h"
 #include "server/server.h"
@@ -32,7 +32,7 @@ void App::stop() noexcept {
             return;
         }
 
-        const auto next = current == AppState::Configuring
+        const auto next = current == (AppState::Configuring)
             ? AppState::Stopped
             : AppState::Stopping;
 
@@ -53,10 +53,6 @@ void App::init() {
 
     try {
         server_->init(config_.port, config_.threads, [this] { stop(); });
-    } catch (const std::exception& e) {
-        state_.store(AppState::Stopped);
-        std::cerr << "[Blaze] FATAL: Application execution failed: " << e.what() << std::endl;
-        throw;
     } catch (...) {
         state_.store(AppState::Stopped);
         throw;

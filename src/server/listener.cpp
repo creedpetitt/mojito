@@ -14,31 +14,30 @@ Listener::Listener(
 
     beast::error_code ec;
 
-    acceptor_.open(endpoint.protocol(), ec);
+    ec = acceptor_.open(endpoint.protocol(), ec);
     if (ec) throw std::runtime_error("Acceptor open failed: " + ec.message());
 
-    acceptor_.set_option(net::socket_base::reuse_address(true), ec);
+    ec = acceptor_.set_option(net::socket_base::reuse_address(true), ec);
     if (ec) throw std::runtime_error("Acceptor reuse_address failed: " + ec.message());
 
-    acceptor_.bind(endpoint, ec);
+    ec = acceptor_.bind(endpoint, ec);
     if (ec) throw std::runtime_error("Acceptor bind failed: " + ec.message());
 
-    acceptor_.listen(net::socket_base::max_listen_connections, ec);
+    ec = acceptor_.listen(net::socket_base::max_listen_connections, ec);
     if (ec) throw std::runtime_error("Acceptor listen failed: " + ec.message());
 }
 
 void Listener::run() {
-    do_accept();
+    accept_connection();
 }
 
-void Listener::do_accept() {
+void Listener::accept_connection() {
     acceptor_.async_accept(
         net::make_strand(ioc_),
         beast::bind_front_handler(&Listener::on_accept, shared_from_this()));
 }
 
-void Listener::on_accept(const beast::error_code& ec, tcp::socket socket)
-{
+void Listener::on_accept(const beast::error_code& ec, tcp::socket socket) {
     if (ec) {
         if (ec == net::error::operation_aborted) {
             return;
@@ -52,13 +51,13 @@ void Listener::on_accept(const beast::error_code& ec, tcp::socket socket)
     }
 
     if (acceptor_.is_open()) {
-        do_accept();
+        accept_connection();
     }
 }
 
 void Listener::stop() noexcept {
     beast::error_code ec;
-    acceptor_.close(ec);
+    ec = acceptor_.close(ec);
 }
 
 } // namespace blaze

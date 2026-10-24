@@ -12,7 +12,7 @@
 
 namespace beast = boost::beast;
 namespace http = beast::http;
-namespace net = boost::asio;
+
 using tcp = boost::asio::ip::tcp;
 
 namespace blaze {
@@ -35,15 +35,14 @@ namespace blaze {
             Stream&& stream);
 
         void run();
-        void do_read();
-        void on_read(const beast::error_code& ec, std::size_t bytes_transferred);
+        void start_read();
+        void read_bytes(const beast::error_code& ec, std::size_t bytes_transferred);
 
-        void do_shutdown();
+        void shutdown_session();
 
     private:
         std::string get_client_ip();
         void send_error_response(http::status status, std::string_view message);
     };
 
-    using Session = HttpSession<beast::tcp_stream>;
 } // namespace blaze

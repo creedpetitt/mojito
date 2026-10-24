@@ -18,7 +18,10 @@
 using namespace blaze;
 
 int main() {
-    App app;
+
+    auto cfg = blaze::ConfigBuilder().threads(8).build();
+    
+    App app{cfg};
 
     // 1. Custom Timer Middleware
     app.use([](Request& req, Response& res, Next next) -> Async<void> {

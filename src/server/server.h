@@ -34,10 +34,10 @@ public:
     Server& operator=(const Server&) = delete;
 
     // App enforces single startup and owns the shutdown-state transitions.
-    void init(int port, int num_threads, std::function<void()> request_stop);
+    void init(uint16_t port, int num_threads, std::function<void()> request_stop);
     void stop() noexcept;
     void spawn(Async<void> task);
-    net::io_context& engine() { return ioc_; }
+    net::io_context& get_engine() { return ioc_; }
 
 private:
     void run(int num_threads);

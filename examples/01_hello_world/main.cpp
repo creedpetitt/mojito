@@ -36,7 +36,7 @@ int main() {
         co_return;
     });
 
-    app.get("/api/hello", []() -> Async<Json> {
+    app.get("/api/hello", [](Request& req) -> Async<Json> {
         co_return Json{
             {"message", "Hello from Blaze"},
             {"ok", true}

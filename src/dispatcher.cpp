@@ -6,32 +6,32 @@
 
 namespace blaze {
 
-    namespace {
-    
-        Async<void> not_found_handler(Request&, Response& resp) {
-            resp.status(404).send("404 Not Found\n");
-            co_return;
-        }
+namespace {
+    Async<void> not_found_handler(Request&, Response& resp) {
+        resp.status(404).send("404 Not Found\n");
+        co_return;
+    }
         
-        const Handler& not_found() {
-            static const Handler handler = not_found_handler;
-            return handler;
-        }
-    
-    } // namespace
+    const Handler& not_found() {
+        static const Handler handler = not_found_handler;
+        return handler;
+    }
+
+} // namespace
 
 Dispatcher::Dispatcher(
     const Router& router,
     const std::vector<Middleware>& middleware,
     const Config& config) : router_(router), middleware_(middleware), config_(config) {}
 
+// Loop though middleware vector and transform req/res in steps
 Async<void> Dispatcher::run_middleware(
     size_t index,
     Request& req,
     Response& res,
     const Handler& final_handler) const {
     if (index < middleware_.size()) {
-        const auto& mw = middleware_[index];
+        const auto& mw = middleware_.at(index);
         co_await mw(req, res, [this, index, &req, &res, &final_handler]() -> Async<void> {
             co_await run_middleware(index + 1, req, res, final_handler);
         });

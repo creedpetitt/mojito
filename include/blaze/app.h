@@ -7,7 +7,6 @@
 #include <blaze/config.h>
 
 #include <atomic>
-#include <functional>
 #include <vector>
 #include <memory>
 #include <stdexcept>
