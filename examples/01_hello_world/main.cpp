@@ -44,8 +44,8 @@ int main() {
     });
 
     app.get("/api/users/:id", [](Request& req) -> Async<Json> {
-        const auto id = req.param<int>("id");
-        const auto verbose = req.query_or<bool>("verbose", false);
+        const int id = req.param<int>("id");
+        const bool verbose = req.query_or<bool>("verbose", false);
 
         co_return Json{
             {"id", id},

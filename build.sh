@@ -157,13 +157,6 @@ done
 
 COMMAND="${COMMAND:-build}"
 
-link_compile_commands() {
-    if [[ -f "${BUILD_DIR}/compile_commands.json" ]]; then
-        ln -sf "${BUILD_DIR}/compile_commands.json" compile_commands.json
-        log_info "Linked compile_commands.json -> ${BUILD_DIR}/compile_commands.json"
-    fi
-}
-
 configure() {
     log_info "Configuring moji [Type: ${BUILD_TYPE}, Tests: ${BUILD_TESTS}, Dir: ${BUILD_DIR}]..."
 
@@ -183,7 +176,6 @@ configure() {
     fi
 
     cmake "${cmake_options[@]}"
-    link_compile_commands
     log_success "Configuration complete."
 }
 
@@ -204,7 +196,6 @@ build() {
     fi
 
     cmake "${build_opts[@]}"
-    link_compile_commands
     log_success "Build complete."
 }
 
@@ -225,9 +216,6 @@ test_moji() {
 clean() {
     log_info "Cleaning ${BUILD_DIR} and LSP symlinks..."
     rm -rf "${BUILD_DIR}"
-    if [[ -L "compile_commands.json" ]]; then
-        rm -f "compile_commands.json"
-    fi
     log_success "Clean complete."
 }
 
