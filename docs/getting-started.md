@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you through building your first high-performance web application with Blaze. Blaze is designed to feel as productive as Python or Go while maintaining the extreme performance of C++20 coroutines.
+This guide walks you through building your first high-performance web application with moji. moji is designed to feel as productive as Python or Go while maintaining the extreme performance of C++20 coroutines.
 
 ---
 
@@ -9,16 +9,16 @@ This guide walks you through building your first high-performance web applicatio
 Starting with an empty `main.cpp` file, first include the core application header. This header provides the `App` class and the necessary primitives for routing.
 
 ```cpp
-#include <blaze/app.h>
+#include <moji/app.h>
 
-using namespace blaze;
+using namespace moji;
 ```
 
 ---
 
 ## 2. Declare the App
 
-Next, create a `main()` function and declare a `blaze::App` instance.
+Next, create a `main()` function and declare a `moji::App` instance.
 
 ```cpp
 int main() {
@@ -35,31 +35,31 @@ The **App** class is the central nervous system of your application. It manages:
 
 ## 3. Adding Your First Route
 
-Once you have your app, the next step is to define your endpoints. In Blaze, routes are defined using lambda expressions or function pointers that return an `Async<void>` (a coroutine).
+Once you have your app, the next step is to define your endpoints. In moji, routes are defined using lambda expressions or function pointers that return an `Async<void>` (a coroutine).
 
 ```cpp
 app.get("/", [](Response& res) -> Async<void> {
-    res.send("Hello from Blaze!");
+    res.send("Hello from moji!");
     co_return;
 });
 ```
 
 ### What's happening here?
 1.  **`app.get("/", ...)`**: We are registering a handler for HTTP `GET` requests at the root path (`/`).
-2.  **`[](Response& res)`**: Blaze automatically "injects" a **Response** object into your handler. You use this to talk back to the client.
-3.  **`-> Async<void>`**: This marks the function as a C++20 coroutine. This is why Blaze is so fast—it can "suspend" your function if it's waiting for I/O, freeing up the CPU for other users.
-4.  **`res.send(...)`**: This tells Blaze to prepare a plain-text response.
+2.  **`[](Response& res)`**: moji automatically "injects" a **Response** object into your handler. You use this to talk back to the client.
+3.  **`-> Async<void>`**: This marks the function as a C++20 coroutine. This is why moji is so fast—it can "suspend" your function if it's waiting for I/O, freeing up the CPU for other users.
+4.  **`res.send(...)`**: This tells moji to prepare a plain-text response.
 5.  **`co_return`**: Since this is a coroutine, we use `co_return` instead of `return`.
 
 ### Application Configuration
 
-Blaze provides a fluent "Builder" API to configure your server's behavior. You should apply these settings before calling `listen()`.
+moji provides a fluent "Builder" API to configure your server's behavior. You should apply these settings before calling `listen()`.
 
 ```cpp
 int main() {
     App app;
 
-    app.server_name("MyBlazeApp/1.0")  // Custom 'Server' header
+    app.server_name("MymojiApp/1.0")  // Custom 'Server' header
        .max_body_size(5 * 1024 * 1024) // Limit uploads to 5MB
        .timeout(60)                    // 60s request timeout
        .num_threads(8);                // Specify thread pool size
@@ -88,7 +88,7 @@ int main() {
 }
 ```
 
-By default, Blaze logs every incoming request with an `ACCESS` prefix, including the client's IP, method, path, status code, and response time.
+By default, moji logs every incoming request with an `ACCESS` prefix, including the client's IP, method, path, status code, and response time.
 
 ---
 
@@ -126,7 +126,7 @@ Modern C++ compilers (like GCC 11) perform complex state-machine transformations
 
 ## 4. Scaling & Stability
 
-As your application grows, Blaze provides the tools to maintain a clean, stable codebase.
+As your application grows, moji provides the tools to maintain a clean, stable codebase.
 
 ### Controller Pattern
 Organize your API into logical blocks. A controller is a class where you group related logic.
@@ -161,7 +161,7 @@ In C++, non-static member functions require an **instance** of the class to be c
 
 ## 4. Running the App
 
-After defining your routes, instruct Blaze to start the server. This is done using the `listen()` method.
+After defining your routes, instruct moji to start the server. This is done using the `listen()` method.
 
 ```cpp
 app.listen(8080);
@@ -176,9 +176,9 @@ By default, `listen()` is **blocking**. It starts the internal thread pool and w
 Here is the complete, production-ready code for a Hello World API:
 
 ```cpp
-#include <blaze/app.h>
+#include <moji/app.h>
 
-using namespace blaze;
+using namespace moji;
 
 int main() {
     App app;
@@ -209,32 +209,32 @@ See the [Build System](build-system.md) guide for direct CMake usage and package
 
 ## IDE Support
 
-Blaze is designed to work seamlessly with modern C++ IDEs like **CLion**, **VS Code**, and **Visual Studio**.
+moji is designed to work seamlessly with modern C++ IDEs like **CLion**, **VS Code**, and **Visual Studio**.
 
 Projects can include their own `CMakePresets.json` file if they want IDEs and terminals to share build profiles.
 
 **Pro-Tips for IDEs:**
-1.  **Code Completion**: Blaze's headers expose route and service types clearly so "Go to Definition" and parameter hints work well.
-2.  **Debugging**: You can set breakpoints inside your route handlers and step directly into the Blaze framework source code.
-3.  **Formatting**: Use your editor or formatter of choice; Blaze does not require project-specific formatting tooling.
+1.  **Code Completion**: moji's headers expose route and service types clearly so "Go to Definition" and parameter hints work well.
+2.  **Debugging**: You can set breakpoints inside your route handlers and step directly into the moji framework source code.
+3.  **Formatting**: Use your editor or formatter of choice; moji does not require project-specific formatting tooling.
 
 ## Advanced Essentials
 
 ### Environment Variables
-Most applications need configuration (API keys, ports). Blaze provides a built-in, type-safe environment manager.
+Most applications need configuration (API keys, ports). moji provides a built-in, type-safe environment manager.
 
 ```cpp
-#include <blaze/environment.h>
+#include <moji/environment.h>
 
 int main() {
     // 1. Load the .env file
-    blaze::load_env();
+    moji::load_env();
 
     // 2. Fetch variables with a default fallback
-    int port = blaze::env<int>("PORT", 8080);
+    int port = moji::env<int>("PORT", 8080);
     
     // 3. Or fetch strictly (throws if missing)
-    std::string key = blaze::env("SECRET_KEY");
+    std::string key = moji::env("SECRET_KEY");
 
     App app;
     app.listen(port);

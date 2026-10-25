@@ -1,9 +1,9 @@
-#include <blaze/json.h>
+#include <moji/json.h>
 #include <boost/json/src.hpp>
 
 #include <limits>
 
-namespace blaze {
+namespace moji {
 
 struct Json::Impl {
     boost::json::value value{nullptr};
@@ -310,4 +310,4 @@ std::string Json::dump() const {
     return boost::json::serialize(impl_->value);
 }
 
-} // namespace blaze
+} // namespace moji

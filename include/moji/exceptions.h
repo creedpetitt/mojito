@@ -3,10 +3,10 @@
 #include <stdexcept>
 #include <string>
 
-namespace blaze {
+namespace moji {
 
 /**
- * @brief Base class for all HTTP-related exceptions in Blaze.
+ * @brief Base class for all HTTP-related exceptions in moji.
  */
 class HttpError : public std::runtime_error {
 private:
@@ -62,4 +62,4 @@ public:
         HttpError(503, msg) {}
 };
 
-} // namespace blaze
+} // namespace moji

@@ -8,18 +8,18 @@
  * - Request timing
  */
 
-#include <blaze/app.h>
-#include <blaze/middleware.h>
+#include <moji/app.h>
+#include <moji/middleware.h>
 #include <chrono>
 #include <ctime>
 #include <iostream>
 #include <string>
 
-using namespace blaze;
+using namespace moji;
 
 int main() {
 
-    auto cfg = blaze::ConfigBuilder().threads(8).build();
+    auto cfg = moji::ConfigBuilder().threads(8).build();
     
     App app{cfg};
 

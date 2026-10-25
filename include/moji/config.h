@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace blaze {
+namespace moji {
 
 struct Config {
     uint16_t port{8080};
@@ -14,7 +14,7 @@ struct Config {
     size_t max_body_size{10 * 1024 * 1024}; // 10 MB
     std::chrono::seconds timeout_seconds{30};
     std::chrono::seconds shutdown_timeout{30};
-    std::string server_name{"Blaze/1.0"};
+    std::string server_name{"moji/1.0"};
     bool expose_client_ip{false};
 };
 
@@ -34,4 +34,4 @@ private:
     Config config_;
 };
 
-} // namespace blaze
+} // namespace moji

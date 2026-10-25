@@ -1,7 +1,7 @@
 /**
  * Example 01: Hello World
  *
- * This example demonstrates the most basic Blaze application.
+ * This example demonstrates the most basic moji application.
  * Concepts:
  * - App instance creation
  * - Configuring the application
@@ -10,17 +10,17 @@
  * - Starting the server
  */
 
-#include <blaze/app.h>
+#include <moji/app.h>
 #include <print>
 
-#include "../../include/blaze/config.h"
+#include "../../include/moji/config.h"
 
-using namespace blaze;
+using namespace moji;
 
 int main() {
 
     // Create and configure the application
-    blaze::Config cfg = blaze::ConfigBuilder()
+    moji::Config cfg = moji::ConfigBuilder()
         .server_name("HelloWorldApp/1.0")
         .threads(8)
         .port(8080)
@@ -32,13 +32,13 @@ int main() {
     // Handlers are lambdas that return Async<void> (a C++20 coroutine)
     app.get("/", [](Response& res) -> Async<void> {
         // Send a plain text response
-        res.send("Hello from Blaze!");
+        res.send("Hello from moji!");
         co_return;
     });
 
     app.get("/api/hello", [](Request& req) -> Async<Json> {
         co_return Json{
-            {"message", "Hello from Blaze"},
+            {"message", "Hello from moji"},
             {"ok", true}
         };
     });

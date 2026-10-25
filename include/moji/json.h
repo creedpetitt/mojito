@@ -1,7 +1,7 @@
 #pragma once
 
-#include <blaze/exceptions.h>
-#include <blaze/util/string.h>
+#include <moji/exceptions.h>
+#include <moji/util/string.h>
 
 #include <concepts>
 #include <cstdint>
@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace blaze {
+namespace moji {
 
 namespace detail {
 template<typename>
@@ -129,4 +129,4 @@ template<> std::uint64_t Json::as<std::uint64_t>() const;
 template<> double Json::as<double>() const;
 template<> Json Json::as<Json>() const;
 
-} // namespace blaze
+} // namespace moji

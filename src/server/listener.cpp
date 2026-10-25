@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace blaze {
+namespace moji {
 
 Listener::Listener(
     net::io_context& ioc,
@@ -60,4 +60,4 @@ void Listener::stop() noexcept {
     ec = acceptor_.close(ec);
 }
 
-} // namespace blaze
+} // namespace moji

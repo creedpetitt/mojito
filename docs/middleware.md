@@ -1,6 +1,6 @@
 # Middleware & Security
 
-Middleware is a powerful way to extend Blaze. It allows you to run code for every request, either before it reaches your route handler or after it finishes.
+Middleware is a powerful way to extend moji. It allows you to run code for every request, either before it reaches your route handler or after it finishes.
 
 ---
 
@@ -40,10 +40,10 @@ app.use(middleware::static_files("public")); // Serves assets from the 'public' 
 
 ## 3. Passing Data (`Request Context`)
 
-Middleware often generates data that your routes need (like a User ID or a Trace ID). Blaze provides two ways to pass this data:
+Middleware often generates data that your routes need (like a User ID or a Trace ID). moji provides two ways to pass this data:
 
 ### Type-Safe Context (`Context<T>`)
-Blaze uses a **Type-Based** injection system. To use injection, you must store data using the C++ type as the key.
+moji uses a **Type-Based** injection system. To use injection, you must store data using the C++ type as the key.
 
 ```cpp
 // 1. Define a unique struct for your data
@@ -77,7 +77,7 @@ std::string session = req.get<std::string>("session_id");
 ```
 
 ### User Identity & `is_authenticated()`
-Blaze includes request-level identity storage for applications that provide their own authentication middleware. This is a "Producer/Consumer" model:
+moji includes request-level identity storage for applications that provide their own authentication middleware. This is a "Producer/Consumer" model:
 
 1.  **The Producer**: Your middleware validates credentials and attaches an identity to the request via `req.set_user(json_payload)`.
 2.  **The Consumer**: Your route handlers check if a user is present and access their data.
@@ -110,12 +110,12 @@ app.use(middleware::rate_limit(100, 60));
 ```
 
 ### Zero-Copy File Streaming
-The `static_files` middleware uses high-performance **Zero-Copy Streaming**. Unlike traditional frameworks that read a file into a memory buffer before sending it, Blaze uses `boost::beast::http::file_body`.
+The `static_files` middleware uses high-performance **Zero-Copy Streaming**. Unlike traditional frameworks that read a file into a memory buffer before sending it, moji uses `boost::beast::http::file_body`.
 
 **Benefits:**
-*   **Zero RAM Overhead**: Whether you serve a 1KB icon or a 10GB video, Blaze consumes virtually no additional memory.
+*   **Zero RAM Overhead**: Whether you serve a 1KB icon or a 10GB video, moji consumes virtually no additional memory.
 *   **Kernel-Level Efficiency**: The OS handles the data transfer directly from the disk cache to the network socket.
-*   **Automatic MIME Detection**: Blaze automatically detects and caches MIME types for all common web formats.
+*   **Automatic MIME Detection**: moji automatically detects and caches MIME types for all common web formats.
 
 ```cpp
 app.use(middleware::static_files("public"));

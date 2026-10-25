@@ -1,6 +1,6 @@
-#include "blaze/config.h"
+#include "moji/config.h"
 
-namespace blaze {
+namespace moji {
 
     ConfigBuilder&
     ConfigBuilder::port(const u_int16_t port) {
@@ -47,4 +47,4 @@ namespace blaze {
     Config ConfigBuilder::build() {
         return config_;
     }
-} // namespace blaze
+} // namespace moji

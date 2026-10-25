@@ -8,7 +8,7 @@
 #include <functional>
 #include <memory>
 
-namespace blaze {
+namespace moji {
 
 namespace beast = boost::beast;
 namespace net = boost::asio;
@@ -34,4 +34,4 @@ private:
     void on_accept(const beast::error_code& ec, tcp::socket socket);
 };
 
-} // namespace blaze
+} // namespace moji

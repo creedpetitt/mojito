@@ -1,16 +1,16 @@
 #pragma once
 
-#include <blaze/config.h>
-#include <blaze/middleware.h>
-#include <blaze/request.h>
-#include <blaze/response.h>
-#include <blaze/router.h>
+#include <moji/config.h>
+#include <moji/middleware.h>
+#include <moji/request.h>
+#include <moji/response.h>
+#include <moji/router.h>
 
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace blaze {
+namespace moji {
 
 class Dispatcher {
     const Router& router_;
@@ -26,4 +26,4 @@ private:
     Async<void> run_middleware(size_t index, Request& req, Response& res, const Handler& final_handler) const;
 };
 
-} // namespace blaze
+} // namespace moji

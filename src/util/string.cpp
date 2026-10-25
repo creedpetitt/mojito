@@ -1,10 +1,10 @@
-#include <blaze/util/string.h>
+#include <moji/util/string.h>
 #include <string>
 #include <string_view>
 #include <cctype>
 #include <algorithm>
 
-namespace blaze::util {
+namespace moji::util {
 
 namespace {
     int hex_to_int(const char c) {
@@ -49,4 +49,4 @@ std::string hex_encode(const std::string_view input) {
     return result;
 }
 
-} // namespace blaze::util
+} // namespace moji::util

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <blaze/handler.h>
+#include <moji/handler.h>
 
 #include <optional>
 #include <string>
@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace blaze {
+namespace moji {
 
 struct MatchedRoute {
     const Handler* handler;
@@ -34,4 +34,4 @@ private:
     std::vector<RouteEntry> routes_;
 };
 
-} // namespace blaze
+} // namespace moji

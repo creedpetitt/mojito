@@ -1,11 +1,11 @@
-#include <blaze/exceptions.h>
-#include <blaze/request.h>
-#include <blaze/util/string.h>
+#include <moji/exceptions.h>
+#include <moji/request.h>
+#include <moji/util/string.h>
 
 #include <algorithm>
 #include <cctype>
 
-namespace blaze {
+namespace moji {
 
 namespace {
 
@@ -123,4 +123,4 @@ Json Request::json() const {
     return std::move(*parsed);
 }
 
-} // namespace blaze
+} // namespace moji

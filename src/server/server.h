@@ -1,14 +1,14 @@
 #pragma once
 
-#include <blaze/config.h>
-#include <blaze/async.h>
+#include <moji/config.h>
+#include <moji/async.h>
 
 #include <boost/asio.hpp>
 
 #include <functional>
 #include <memory>
 
-namespace blaze {
+namespace moji {
 
 namespace net = boost::asio;
 
@@ -44,4 +44,4 @@ private:
     void cleanup() noexcept;
 };
 
-} // namespace blaze
+} // namespace moji

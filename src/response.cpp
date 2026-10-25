@@ -1,4 +1,4 @@
-#include <blaze/response.h>
+#include <moji/response.h>
 
 #include <algorithm>
 #include <cctype>
@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace blaze {
+namespace moji {
 
 namespace {
 
@@ -187,4 +187,4 @@ Response& Response::not_found(const std::string& message) {
     return json({{"error", "Not Found"}, {"message", message}});
 }
 
-} // namespace blaze
+} // namespace moji

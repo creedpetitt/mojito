@@ -1,4 +1,4 @@
-#include <blaze/app.h>
+#include <moji/app.h>
 
 #include <memory>
 #include <functional>
@@ -6,7 +6,7 @@
 #include "dispatcher.h"
 #include "server/server.h"
 
-namespace blaze {
+namespace moji {
 
 App::App() {
     dispatcher_ = std::make_unique<Dispatcher>(router_, middleware_, config_);
@@ -65,4 +65,4 @@ void App::use(const Middleware &mw) {
     middleware_.push_back(mw);
 }
 
-} // namespace blaze
+} // namespace moji

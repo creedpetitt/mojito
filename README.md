@@ -1,9 +1,9 @@
 <div align="center">
   <img src="docs/assets/logo.png" width = 500>
-  <p><b>Blaze is a high-performance, asynchronous C++20 web framework designed for developer productivity and extreme scalability</b></p>
+  <p><b>moji is a high-performance, asynchronous C++20 web framework designed for developer productivity and extreme scalability</b></p>
 
 
-[![Blaze CI](https://github.com/Creed-Petitt/blaze/actions/workflows/ci.yml/badge.svg)](https://github.com/Creed-Petitt/blaze/actions/workflows/ci.yml)
+[![moji CI](https://github.com/Creed-Petitt/moji/actions/workflows/ci.yml/badge.svg)](https://github.com/Creed-Petitt/moji/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-red)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-red)
 ![Standard](https://img.shields.io/badge/c%2B%2B-20-red)
@@ -19,18 +19,18 @@
 
 ## Installation
 
-Install Blaze as a CMake package, or consume it directly with `FetchContent`.
+Install moji as a CMake package, or consume it directly with `FetchContent`.
 
 ```bash
 // YOLO mode
-curl -fsSL https://raw.githubusercontent.com/Creed-Petitt/blaze/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Creed-Petitt/moji/main/install.sh | bash
 ```
 
 > **Note:** The installer (`install.sh`) installs only the core build tools.
 
 ## Local Development
 
-Build Blaze from this repository:
+Build moji from this repository:
 
 ```bash
 ./build.sh
@@ -46,15 +46,15 @@ Build and run the test suite:
 
 1. **Write** your logic (e.g., in `src/main.cpp`):
    ```cpp
-   #include <blaze/app.h>
+   #include <moji/app.h>
 
-   using namespace blaze;
+   using namespace moji;
 
    int main() {
        App app;
 
        app.get("/hello", [](Response& res) -> Async<void> {
-           res.send("Hello from Blaze");
+           res.send("Hello from moji");
            co_return;
       });
 
@@ -88,11 +88,11 @@ Build and run the test suite:
 
 ## Requirements
 
-Blaze is designed for modern Linux and macOS environments.
+moji is designed for modern Linux and macOS environments.
 
 - **Compiler**: C++20 compliant (GCC 11+, Clang 13+, or MSVC 2022+).
 - **Engine**: Boost 1.85+ (Automatically managed via CMake).
 
 ## License
 
-Blaze is released under the [MIT License](LICENSE).
+moji is released under the [MIT License](LICENSE).

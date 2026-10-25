@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-namespace blaze {
+namespace moji {
 
 SignalHandler::SignalHandler(net::io_context& ioc, std::function<void(int)> on_signal)
     : signals_(ioc, SIGINT, SIGTERM), on_signal_(std::move(on_signal)) {}
@@ -23,4 +23,4 @@ void SignalHandler::cancel() noexcept {
     (void)signals_.cancel(ec);
 }
 
-} // namespace blaze
+} // namespace moji

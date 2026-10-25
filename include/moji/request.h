@@ -1,8 +1,8 @@
 #pragma once
 
-#include <blaze/json.h>
-#include <blaze/header.h>
-#include <blaze/util/string.h>
+#include <moji/json.h>
+#include <moji/header.h>
+#include <moji/util/string.h>
 
 #include <any>
 #include <expected>
@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace blaze {
+namespace moji {
 
 class Request {
 public:
@@ -106,4 +106,4 @@ private:
     std::unordered_map<std::string, std::any> state_;
 };
 
-} // namespace blaze
+} // namespace moji

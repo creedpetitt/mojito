@@ -1,6 +1,6 @@
 #pragma once
 
-#include <blaze/exceptions.h>
+#include <moji/exceptions.h>
 
 #include <string>
 #include <string_view>
@@ -10,7 +10,7 @@
 #include <system_error>
 #include <utility>
 
-namespace blaze::util {
+namespace moji::util {
 
 enum class ParseErrorCode {
     Invalid,
@@ -110,9 +110,9 @@ T convert_string(std::string_view s) {
     return std::move(*parsed);
 }
 
-} // namespace blaze::util
+} // namespace moji::util
 
-namespace blaze {
+namespace moji {
     using util::to_string_param;
     using util::parse_value;
     using util::convert_string;

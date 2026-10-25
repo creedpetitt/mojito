@@ -1,7 +1,7 @@
 #pragma once
 
-#include <blaze/header.h>
-#include <blaze/json.h>
+#include <moji/header.h>
+#include <moji/json.h>
 
 #include <concepts>
 #include <optional>
@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace blaze {
+namespace moji {
 
 class Response {
 
@@ -65,4 +65,4 @@ private:
     std::optional<std::string> file_path_;
 };
 
-} // namespace blaze
+} // namespace moji

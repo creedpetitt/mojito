@@ -2,7 +2,7 @@
 
 #include <boost/asio/awaitable.hpp>
 
-namespace blaze {
+namespace moji {
 
 template <typename T = void>
 using Async = boost::asio::awaitable<T>;
@@ -19,4 +19,4 @@ struct async_result<Async<T>> {
     static constexpr bool is_async = true;
 };
 
-} // namespace blaze
+} // namespace moji

@@ -1,10 +1,10 @@
 #include "dispatcher.h"
 
-#include <blaze/exceptions.h>
+#include <moji/exceptions.h>
 
 #include <utility>
 
-namespace blaze {
+namespace moji {
 
 namespace {
     Async<void> not_found_handler(Request&, Response& resp) {
@@ -16,7 +16,6 @@ namespace {
         static const Handler handler = not_found_handler;
         return handler;
     }
-
 } // namespace
 
 Dispatcher::Dispatcher(
@@ -40,14 +39,16 @@ Async<void> Dispatcher::run_middleware(
     }
 }
 
-Async<Response> Dispatcher::handle(Request& req, const std::string_view client_ip, const bool keep_alive) const {
+Async<Response> Dispatcher::handle(
+    Request& req, const std::string_view client_ip, 
+    const bool keep_alive) const {
+        
     Response res;
-
     try {
         if (config_.expose_client_ip) {
             req.set_state("client_ip", std::string(client_ip));
         }
-        auto match = router_.match(req.method(), req.path());
+        std::optional<MatchedRoute> match = router_.match(req.method(), req.path());
 
         const Handler* handler = nullptr;
         if (match.has_value()) {
@@ -56,15 +57,18 @@ Async<Response> Dispatcher::handle(Request& req, const std::string_view client_i
         } else {
             handler = &not_found();
         }
-
+        
         co_await run_middleware(0, req, res, *handler);
+        
     } catch (const HttpError& e) {
-        res.status(e.status()).json({
+        res.status(e.status())
+           .json({
             {"error", "HTTP Error"},
             {"message", e.what()}
         });
     } catch (const std::exception& e) {
-        res.status(500).json({
+        res.status(500)
+           .json({
             {"error", "Internal Server Error"},
             {"message", e.what()}
         });
@@ -76,4 +80,4 @@ Async<Response> Dispatcher::handle(Request& req, const std::string_view client_i
     co_return res;
 }
 
-} // namespace blaze
+} // namespace moji

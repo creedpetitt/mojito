@@ -6,7 +6,7 @@
 
 namespace net = boost::asio;
 
-namespace blaze {
+namespace moji {
 
 class SignalHandler {
     net::signal_set signals_;
@@ -19,4 +19,4 @@ public:
     void cancel() noexcept;
 };
 
-} // namespace blaze
+} // namespace moji

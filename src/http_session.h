@@ -1,6 +1,6 @@
 #pragma once
 
-#include <blaze/config.h>
+#include <moji/config.h>
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
@@ -15,7 +15,7 @@ namespace http = beast::http;
 
 using tcp = boost::asio::ip::tcp;
 
-namespace blaze {
+namespace moji {
     
     class Dispatcher;
 
@@ -45,4 +45,4 @@ namespace blaze {
         void send_error_response(http::status status, std::string_view message);
     };
 
-} // namespace blaze
+} // namespace moji

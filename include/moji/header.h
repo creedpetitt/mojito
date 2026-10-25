@@ -2,11 +2,11 @@
 
 #include <string>
 
-namespace blaze {
+namespace moji {
 
 struct Header {
     std::string name;
     std::string value;
 };
 
-} // namespace blaze
+} // namespace moji

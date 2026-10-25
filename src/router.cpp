@@ -1,9 +1,9 @@
-#include <blaze/router.h>
-#include <blaze/util/string.h>
+#include <moji/router.h>
+#include <moji/util/string.h>
 
 #include <utility>
 
-namespace blaze {
+namespace moji {
 
 namespace {
 
@@ -117,4 +117,4 @@ std::optional<MatchedRoute> Router::match(
     return std::nullopt;
 }
 
-} // namespace blaze
+} // namespace moji

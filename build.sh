@@ -40,12 +40,12 @@ usage() {
     echo -e "${BOLD}Usage:${NC} ./build.sh [options] [command]
 
 ${BOLD}Commands:${NC}
-  build               Configure (if needed) and build Blaze (default)
+  build               Configure (if needed) and build moji (default)
   configure           Run CMake configuration into \${BUILD_DIR}
   test                Configure, build, and run CTest test suite
   clean               Remove build directory and compile_commands symlink
   rebuild             Clean and build from scratch
-  install             Build and install Blaze package
+  install             Build and install moji package
 
 ${BOLD}Build Mode Flags:${NC}
   -r, --release        Build with Release mode (optimizations on)
@@ -165,21 +165,21 @@ link_compile_commands() {
 }
 
 configure() {
-    log_info "Configuring Blaze [Type: ${BUILD_TYPE}, Tests: ${BUILD_TESTS}, Dir: ${BUILD_DIR}]..."
+    log_info "Configuring moji [Type: ${BUILD_TYPE}, Tests: ${BUILD_TESTS}, Dir: ${BUILD_DIR}]..."
 
     local cmake_options=(
         -S .
         -B "${BUILD_DIR}"
         -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-        -DBLAZE_BUILD_TESTS="${BUILD_TESTS}"
-        -DBLAZE_ENABLE_SANITIZERS="${ENABLE_SANITIZERS}"
-        -DBLAZE_ENABLE_TSAN="${ENABLE_TSAN}"
-        -DBLAZE_BUILD_FUZZERS="${ENABLE_FUZZERS}"
+        -Dmoji_BUILD_TESTS="${BUILD_TESTS}"
+        -Dmoji_ENABLE_SANITIZERS="${ENABLE_SANITIZERS}"
+        -Dmoji_ENABLE_TSAN="${ENABLE_TSAN}"
+        -Dmoji_BUILD_FUZZERS="${ENABLE_FUZZERS}"
     )
 
-    if [[ -n "${BLAZE_BOOST_SOURCE_DIR:-}" ]]; then
-        cmake_options+=("-DBLAZE_BOOST_SOURCE_DIR=${BLAZE_BOOST_SOURCE_DIR}")
+    if [[ -n "${moji_BOOST_SOURCE_DIR:-}" ]]; then
+        cmake_options+=("-Dmoji_BOOST_SOURCE_DIR=${moji_BOOST_SOURCE_DIR}")
     fi
 
     cmake "${cmake_options[@]}"
@@ -192,7 +192,7 @@ build() {
         configure
     fi
 
-    log_info "Building Blaze targets in ${BUILD_DIR}..."
+    log_info "Building moji targets in ${BUILD_DIR}..."
     local build_opts=(--build "${BUILD_DIR}")
     if [[ -n "$JOBS" ]]; then
         build_opts+=(--parallel "$JOBS")
@@ -208,7 +208,7 @@ build() {
     log_success "Build complete."
 }
 
-test_blaze() {
+test_moji() {
     if [[ "$BUILD_TESTS" != "ON" ]]; then
         log_warn "Tests were explicitly disabled (--no-tests), re-enabling for 'test' command."
         BUILD_TESTS="ON"
@@ -237,9 +237,9 @@ rebuild() {
     build
 }
 
-install_blaze() {
+install_moji() {
     build
-    log_info "Installing Blaze package..."
+    log_info "Installing moji package..."
     if [[ -w /usr/local ]]; then
         cmake --install "${BUILD_DIR}"
     else
@@ -256,7 +256,7 @@ case "${COMMAND}" in
         build
         ;;
     test)
-        test_blaze
+        test_moji
         ;;
     clean)
         clean
@@ -265,6 +265,6 @@ case "${COMMAND}" in
         rebuild
         ;;
     install)
-        install_blaze
+        install_moji
         ;;
 esac

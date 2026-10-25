@@ -1,6 +1,6 @@
 # Routing & Request Handling
 
-Routing is the process of mapping an incoming HTTP request to a specific piece of C++ logic. Blaze features a powerful, type-safe router that eliminates the boilerplate of manual request parsing.
+Routing is the process of mapping an incoming HTTP request to a specific piece of C++ logic. moji features a powerful, type-safe router that eliminates the boilerplate of manual request parsing.
 
 ---
 
@@ -20,16 +20,16 @@ app.post("/submit", [](Request& req, Response& res) -> Async<void> {
 });
 ```
 
-Blaze supports `get`, `post`, `put`, and `del` (for DELETE).
+moji supports `get`, `post`, `put`, and `del` (for DELETE).
 
 ---
 
 ## 2. Magic Typed Injection
 
-This is Blaze's most powerful feature. Instead of manually extracting data from `Request`, you can simply declare what you need as function arguments. Blaze will "auto-fill" them for you.
+This is moji's most powerful feature. Instead of manually extracting data from `Request`, you can simply declare what you need as function arguments. moji will "auto-fill" them for you.
 
 ### Path Parameters (`Path<T>`)
-Use `:id` syntax in your URL to capture variables. Blaze automatically converts them to your target C++ type.
+Use `:id` syntax in your URL to capture variables. moji automatically converts them to your target C++ type.
 
 ```cpp
 // Route: /users/:id/files/:file_id
@@ -40,14 +40,14 @@ app.get("/users/:id/files/:file_id", [](Path<int> uid, Path<int> fid) -> Async<J
 ```
 
 ### Request Body (`Body<T>`)
-If you send JSON in the request body, Blaze can parse it directly into a C++ struct.
+If you send JSON in the request body, moji can parse it directly into a C++ struct.
 
 ```cpp
 struct User {
     std::string name;
     int age;
 };
-BLAZE_MODEL(User, name, age) // Enable reflection
+moji_MODEL(User, name, age) // Enable reflection
 
 app.post("/users", [](Body<User> user) -> Async<void> {
     // Access members directly
@@ -57,14 +57,14 @@ app.post("/users", [](Body<User> user) -> Async<void> {
 ```
 
 ### Query Parameters (`Query<T>`)
-Handle query strings like `?page=2&q=blaze` by mapping them to a struct.
+Handle query strings like `?page=2&q=moji` by mapping them to a struct.
 
 ```cpp
 struct Search {
     std::string q;
     int page;
 };
-BLAZE_MODEL(Search, q, page)
+moji_MODEL(Search, q, page)
 
 app.get("/search", [](Query<Search> s) -> Async<Json> {
     co_return Json({{"searching_for", s.q}, {"page", s.page}});
@@ -74,10 +74,10 @@ app.get("/search", [](Query<Search> s) -> Async<Json> {
 ### Requirements & Ergonomics
 
 #### 1. Models are Mandatory
-`Query<T>` and `Body<T>` require `T` to be convertible from request data. `BLAZE_MODEL` remains available for Boost.JSON/Describe mapping.
+`Query<T>` and `Body<T>` require `T` to be convertible from request data. `moji_MODEL` remains available for Boost.JSON/Describe mapping.
 
 #### 2. Inheritance Ergonomics
-`Path<T>` and `Body<T>` **inherit** from your type `T`. This is a core ergonomic feature of Blaze: it means you don't need to call `.value()` or `.get()` to access your data. These wrappers *are* your types, augmented with metadata for the router.
+`Path<T>` and `Body<T>` **inherit** from your type `T`. This is a core ergonomic feature of moji: it means you don't need to call `.value()` or `.get()` to access your data. These wrappers *are* your types, augmented with metadata for the router.
 
 ```cpp
 app.get("/greet/:name", [](Path<std::string> name) -> Async<void> {
@@ -88,7 +88,7 @@ app.get("/greet/:name", [](Path<std::string> name) -> Async<void> {
 ```
 
 #### 3. Dynamic Escape Hatch (`req.json()`)
-If you need to handle unpredictable JSON or don't want to define a model, use `req.json()` to get a dynamic `blaze::Json` object.
+If you need to handle unpredictable JSON or don't want to define a model, use `req.json()` to get a dynamic `moji::Json` object.
 
 ```cpp
 app.post("/dynamic", [](Request& req, Response& res) -> Async<void> {
@@ -136,19 +136,19 @@ res.json(data);
 
 ## 5. The Response Builder
 
-Blaze uses a **Fluent Interface** for responses. This means you can chain methods together like a sentence.
+moji uses a **Fluent Interface** for responses. This means you can chain methods together like a sentence.
 
 ```cpp
 app.get("/custom", [](Response& res) -> Async<void> {
     res.status(201)
-       .header("X-Custom", "Blaze")
+       .header("X-Custom", "moji")
        .json({{"status", "created"}});
     co_return;
 });
 ```
 
 ### Semantic Shortcuts
-Blaze provides semantic helper methods to make your code read like English.
+moji provides semantic helper methods to make your code read like English.
 
 | Method | Status Code | Use Case |
 | :--- | :--- | :--- |
@@ -170,7 +170,7 @@ app.post("/users", [](Body<User> user, Response& res) -> Async<void> {
 ### `send()` vs `json()`
 
 *   **`.send(text)`**: Used for plain text, HTML, or raw bodies. It sends the string exactly as provided.
-*   **`.json(data)`**: Used for `blaze::Json` or any struct with `BLAZE_MODEL`. It automatically sets the `Content-Type: application/json` header and serializes the data for you.
+*   **`.json(data)`**: Used for `moji::Json` or any struct with `moji_MODEL`. It automatically sets the `Content-Type: application/json` header and serializes the data for you.
 
 ---
 
@@ -204,7 +204,7 @@ app.get("/manual", [](Request& req, Response& res) -> Async<void> {
 
 ## 7. Error Handling
 
-Blaze uses exceptions to handle HTTP errors. If you throw an `HttpError` (or any of its children) inside a handler, Blaze will automatically catch it and return the correct status code and a JSON error message to the client.
+moji uses exceptions to handle HTTP errors. If you throw an `HttpError` (or any of its children) inside a handler, moji will automatically catch it and return the correct status code and a JSON error message to the client.
 
 ```cpp
 app.get("/secret", []() -> Async<void> {
@@ -222,11 +222,11 @@ app.get("/secret", []() -> Async<void> {
 *   **`NotFound("msg")`**: Returns 404.
 *   **`InternalServerError("msg")`**: Returns 500.
 
-Standard C++ JSON libraries can be verbose. Blaze includes a lightweight wrapper around `boost::json` to make your code "neat."
+Standard C++ JSON libraries can be verbose. moji includes a lightweight wrapper around `boost::json` to make your code "neat."
 
 ```cpp
 // Creation
-Json data = {{"id", 1}, {"name", "Blaze"}};
+Json data = {{"id", 1}, {"name", "moji"}};
 
 // Access (Type-safe)
 std::string name = data["name"].as<std::string>();

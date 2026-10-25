@@ -1,10 +1,10 @@
-# Blaze Showcase Suite
+# moji Showcase Suite
 
-This directory contains standalone, educational examples designed to teach you the Blaze framework from the ground up.
+This directory contains standalone, educational examples designed to teach you the moji framework from the ground up.
 
 ## List of Examples
 
-1.  **01_hello_world**: The simplest starting point for any Blaze app.
+1.  **01_hello_world**: The simplest starting point for any moji app.
 2.  **03_realtime_chat**: A multi-client chatroom with automatic session cleanup and broadcasting.
 3.  **06_middleware_chain**: Advanced request timing and data passing via custom middleware.
 4.  **09_background_tasks**: Using `app.spawn()` for non-blocking workers.

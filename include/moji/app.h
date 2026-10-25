@@ -1,23 +1,26 @@
 #pragma once
 
-#include <blaze/router.h>
-#include <blaze/middleware.h>
-#include <blaze/injector.h>
-#include <blaze/json.h>
-#include <blaze/config.h>
+#include <moji/router.h>
+#include <moji/middleware.h>
+#include <moji/injector.h>
+#include <moji/json.h>
+#include <moji/config.h>
 
 #include <atomic>
 #include <vector>
 #include <memory>
 #include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <utility>
 
-namespace blaze {
+namespace moji {
 
 class Server;
 class Dispatcher;
 
 /**
- * @brief Represents the lifecycle state of a Blaze application.
+ * @brief Represents the lifecycle state of a moji application.
  */
 enum class AppState {
     Configuring,
@@ -27,7 +30,7 @@ enum class AppState {
 };
 
 /**
- * @brief The primary entry point for a Blaze application.
+ * @brief The primary entry point for a Mojito application.
  * 
  * The App class manages the internal Boost.Asio engine, application services,
  * and HTTP routing.
@@ -125,27 +128,35 @@ private:
         }
     }
 
-    // Takes lambda and converts it into a standard (Request, Response) handler
+    template<typename Result>
+    static void send_handler_result(Response& res, Result&& result) {
+        if constexpr (std::is_convertible_v<Result, std::string>) {
+            res.send(std::forward<Result>(result));
+        } else {
+            res.json(std::forward<Result>(result));
+        }
+    }
+
+    // Adapts synchronous and asynchronous callables to the common Handler type.
     template<typename Func>
     Handler wrap_handler(Func handler) {
         using ReturnType = function_traits<Func>::return_type;
         using AsyncInfo = async_result<ReturnType>;
 
-        return [this, handler](Request& req, Response& res) -> Async<void> {
-            if constexpr (AsyncInfo::is_async && !std::is_void_v<typename AsyncInfo::type>) {
-                using InnerT = AsyncInfo::type;
-                InnerT result = co_await inject_and_call(const_cast<Func&>(handler), req, res);
-
-                if constexpr (std::is_convertible_v<InnerT, std::string>) {
-                    res.send(result);
+        return [handler = std::move(handler)](Request& req, Response& res) mutable -> Async<void> {
+            if constexpr (AsyncInfo::is_async) {
+                if constexpr (std::is_void_v<typename AsyncInfo::type>) {
+                    co_await inject_and_call(handler, req, res); // Async + void
                 } else {
-                    res.json(result);
+                    send_handler_result(res, co_await inject_and_call(handler, req, res)); // Async + return
                 }
+            } else if constexpr (std::is_void_v<ReturnType>) {
+                inject_and_call(handler, req, res); // Sync + void
             } else {
-                co_await inject_and_call(const_cast<Func&>(handler), req, res);
+                send_handler_result(res, inject_and_call(handler, req, res)); // Sync + return 
             }
+            co_return;
         };
     }
 };
-
-} // namespace blaze
+} // namespace moji

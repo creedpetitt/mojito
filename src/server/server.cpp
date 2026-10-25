@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace blaze {
+namespace moji {
 
 Server::Server(
     Dispatcher& dispatcher,
@@ -49,7 +49,7 @@ void Server::init(const uint16_t port, const int num_threads, std::function<void
 
         signals_ = std::make_unique<SignalHandler>
             (ioc_, [request_stop = std::move(request_stop)](const int signal_number) {
-            std::printf("[Blaze] Received signal %d, stopping...\n", signal_number);
+            std::printf("[moji] Received signal %d, stopping...\n", signal_number);
             request_stop();
         });
         signals_->start();
@@ -119,4 +119,4 @@ void Server::run(const int num_threads) {
     }
 }
 
-} // namespace blaze
+} // namespace moji

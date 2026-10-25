@@ -1,12 +1,12 @@
 # Architecture & Design
 
-Blaze is engineered for high-concurrency workloads where I/O latency is the primary bottleneck. This guide explores the design patterns and technical choices that make Blaze unique.
+moji is engineered for high-concurrency workloads where I/O latency is the primary bottleneck. This guide explores the design patterns and technical choices that make moji unique.
 
 ---
 
 ## 1. The Async Core
 
-Blaze is built on top of **Boost.Asio** and **Coroutines**. Unlike traditional frameworks that use one thread per connection (which wastes memory and CPU), Blaze uses a small pool of worker threads to handle thousands of connections.
+moji is built on top of **Boost.Asio** and **Coroutines**. Unlike traditional frameworks that use one thread per connection (which wastes memory and CPU), moji uses a small pool of worker threads to handle thousands of connections.
 
 ### How it works:
 When a handler reaches a `co_await` point, the current function is suspended and its state is saved. The worker thread is then immediately freed to handle a different request. Once the awaited operation completes, the original function resumes exactly where it left off.
@@ -31,7 +31,7 @@ sequenceDiagram
 
 ## 2. Services And Request Context
 
-Blaze keeps services explicit. The app owns long-lived shared services, and each request carries a non-owning pointer to that app registry.
+moji keeps services explicit. The app owns long-lived shared services, and each request carries a non-owning pointer to that app registry.
 
 ### The Service Hierarchy
 1.  **Application Scope**: Services created once at startup.
@@ -55,15 +55,15 @@ graph LR
 
 ## 4. Security by Default
 
-Blaze is designed with a "Secure-by-Default" philosophy:
-*   **Memory Safety**: Blaze uses RAII and smart pointers throughout. Raw `new` and `delete` are virtually non-existent in the codebase.
+moji is designed with a "Secure-by-Default" philosophy:
+*   **Memory Safety**: moji uses RAII and smart pointers throughout. Raw `new` and `delete` are virtually non-existent in the codebase.
 *   **Buffer Safety**: Powered by `boost::beast`, the HTTP parser handles malformed or oversized requests gracefully, preventing common overflow attacks.
 
 ---
 
 ## 5. Lifecycle & Graceful Shutdown
 
-Blaze ensures that your application shuts down cleanly without dropping in-flight requests.
+moji ensures that your application shuts down cleanly without dropping in-flight requests.
 
 ### The Shutdown Sequence
 1.  **Signal Trap**: The server listens for `SIGINT` (Ctrl+C) and `SIGTERM`.
@@ -79,12 +79,12 @@ app.config().shutdown_timeout = 5; // Allow 5 seconds for cleanup
 
 ## 6. Zero-Copy I/O
 
-Blaze is designed to be "Memory-Transparent" when handling large assets. This is achieved through a specialized response pipeline that distinguishes between dynamic and static content.
+moji is designed to be "Memory-Transparent" when handling large assets. This is achieved through a specialized response pipeline that distinguishes between dynamic and static content.
 
 ### The Response Pipeline
 When a request is processed, `App::handle_request` returns a `Response` object rather than a raw string. The `HttpSession` then performs an architectural optimization:
 
 1.  **Dynamic Content**: If the response contains a body (JSON, HTML), it uses `http::string_body`.
-2.  **Static Assets**: If the response points to a file path (via `res.file()`), Blaze swaps the body type to `http::file_body`.
+2.  **Static Assets**: If the response points to a file path (via `res.file()`), moji swaps the body type to `http::file_body`.
 
 This allows the operating system to stream the file directly from the file system to the network interface, bypassing the application's memory space entirely and avoiding expensive data copies.

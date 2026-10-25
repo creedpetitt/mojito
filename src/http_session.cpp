@@ -1,9 +1,9 @@
 #include "http_session.h"
 #include "dispatcher.h"
 
-#include <blaze/exceptions.h>
-#include <blaze/request.h>
-#include <blaze/response.h>
+#include <moji/exceptions.h>
+#include <moji/request.h>
+#include <moji/response.h>
 
 #include <boost/beast/http/file_body.hpp>
 
@@ -13,7 +13,7 @@
 
 namespace net = boost::asio;
 
-namespace blaze {
+namespace moji {
 
 template<class Stream>
 struct StreamTraits {
@@ -30,16 +30,16 @@ struct StreamTraits {
 namespace {
 
 Request make_request(http::request<http::string_body>&& req) {
-    Request blaze_req;
-    blaze_req.set_method(req.method_string());
-    blaze_req.set_target(std::string_view(req.target().data(), req.target().size()));
-    blaze_req.set_body(std::move(req.body()));
+    Request moji_req;
+    moji_req.set_method(req.method_string());
+    moji_req.set_target(std::string_view(req.target().data(), req.target().size()));
+    moji_req.set_body(std::move(req.body()));
 
     for (const auto& field : req) {
-        blaze_req.add_header(field.name_string(), field.value());
+        moji_req.add_header(field.name_string(), field.value());
     }
 
-    return blaze_req;
+    return moji_req;
 }
 
 template <typename Stream>
@@ -58,14 +58,14 @@ boost::asio::awaitable<void> write_error(
 template <typename Stream>
 boost::asio::awaitable<void> write_response(
     Stream& stream,
-    Response& blaze_res,
+    Response& moji_res,
     const bool keep_alive,
     const unsigned version = 11) {
         
-    if (blaze_res.is_file()) {
+    if (moji_res.is_file()) {
         beast::error_code ec;
         http::file_body::value_type body;
-        body.open(blaze_res.get_file_path().c_str(), beast::file_mode::scan, ec);
+        body.open(moji_res.get_file_path().c_str(), beast::file_mode::scan, ec);
 
         if (ec) {
             co_await write_error(stream, http::status::not_found, "File not found", version);
@@ -76,10 +76,10 @@ boost::asio::awaitable<void> write_response(
         http::response<http::file_body> res{
             std::piecewise_construct,
             std::make_tuple(std::move(body)),
-            std::make_tuple(static_cast<http::status>(blaze_res.get_status()), version)
+            std::make_tuple(static_cast<http::status>(moji_res.get_status()), version)
         };
 
-        for (const auto& [name, value] : blaze_res.get_headers()) {
+        for (const auto& [name, value] : moji_res.get_headers()) {
             res.set(name, value);
         }
 
@@ -91,15 +91,15 @@ boost::asio::awaitable<void> write_response(
     }
 
     http::response<http::string_body> res{
-        static_cast<http::status>(blaze_res.get_status()),
+        static_cast<http::status>(moji_res.get_status()),
         version
     };
 
-    for (const auto& [name, value] : blaze_res.get_headers()) {
+    for (const auto& [name, value] : moji_res.get_headers()) {
         res.set(name, value);
     }
 
-    res.body() = blaze_res.take_body();
+    res.body() = moji_res.take_body();
     res.keep_alive(keep_alive);
     res.prepare_payload();
     co_await http::async_write(stream, res, net::use_awaitable);
@@ -115,12 +115,12 @@ boost::asio::awaitable<void> handle_session(
     bool keep_alive,
     const unsigned version) {
         
-    Response blaze_res;
+    Response moji_res;
     bool error_occurred = false;
     std::optional<std::pair<http::status, std::string>> pending_error;
 
     try {
-        blaze_res = co_await dispatcher.handle(req, client_ip, keep_alive);
+        moji_res = co_await dispatcher.handle(req, client_ip, keep_alive);
     } catch (const HttpError& e) {
         pending_error = std::make_pair(static_cast<http::status>(e.status()), std::string(e.what()));
         keep_alive = false;
@@ -143,7 +143,7 @@ boost::asio::awaitable<void> handle_session(
         }
     } else {
         try {
-            co_await write_response(stream, blaze_res, keep_alive, version);
+            co_await write_response(stream, moji_res, keep_alive, version);
         } catch (...) {
             error_occurred = true;
         }
@@ -266,4 +266,4 @@ void HttpSession<Stream>::send_error_response(http::status status, const std::st
 
 template class HttpSession<beast::tcp_stream>;
 
-} // namespace blaze
+} // namespace moji

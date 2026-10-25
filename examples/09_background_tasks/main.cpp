@@ -4,21 +4,21 @@
  * This example demonstrates how to run asynchronous tasks in the background.
  * Concepts:
  * - app.spawn() for background coroutines
- * - blaze::delay() for non-blocking timers
+ * - moji::delay() for non-blocking timers
  * - Periodic background work
  */
 
-#include <blaze/app.h>
+#include <moji/app.h>
 #include <iostream>
 
-using namespace blaze;
+using namespace moji;
 
 // A background worker that runs every 10 seconds without blocking the server.
 Async<void> status_monitor() {
     int tick = 0;
     while (true) {
         std::cout << "[Monitor] background tick " << ++tick << std::endl;
-        co_await blaze::delay(std::chrono::seconds(10));
+        co_await moji::delay(std::chrono::seconds(10));
     }
 }
 
