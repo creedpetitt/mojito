@@ -40,8 +40,7 @@ void Server::init(const uint16_t port, const int num_threads, std::function<void
                 }
 
                 auto session = std::make_shared<HttpSession<beast::tcp_stream>>(
-                    dispatcher_,
-                    config_,
+                    dispatcher_, config_,
                     beast::tcp_stream(std::move(socket)));
                 session->run();
             });

@@ -19,7 +19,7 @@ template<class Stream>
 struct StreamTraits {
     static void shutdown(Stream& stream) {
         beast::error_code ec;
-        beast::get_lowest_layer(stream).socket().shutdown(tcp::socket::shutdown_send, ec);
+        get_socket(stream).shutdown(tcp::socket::shutdown_send, ec);
     }
 
     static tcp::socket& get_socket(Stream& stream) {
@@ -92,8 +92,7 @@ boost::asio::awaitable<void> write_response(
 
     http::response<http::string_body> res{
         static_cast<http::status>(moji_res.get_status()),
-        version
-    };
+        version};
 
     for (const auto& [name, value] : moji_res.get_headers()) {
         res.set(name, value);
@@ -107,13 +106,10 @@ boost::asio::awaitable<void> write_response(
 
 template <typename Stream, typename SessionPtr>
 boost::asio::awaitable<void> handle_session(
-    Stream& stream,
-    SessionPtr self,
-    Dispatcher& dispatcher,
-    Request req,
+    Stream& stream, SessionPtr self,
+    Dispatcher& dispatcher, Request req,
     const std::string_view client_ip,
-    bool keep_alive,
-    const unsigned version) {
+    bool keep_alive, const unsigned version) {
         
     Response moji_res;
     bool error_occurred = false;
@@ -238,7 +234,7 @@ void HttpSession<Stream>::read_bytes(const beast::error_code& ec, std::size_t by
 template<class Stream>
 void HttpSession<Stream>::shutdown_session() {
     beast::get_lowest_layer(stream_).
-        expires_after(std::chrono::seconds(30));
+        expires_after(std::chrono::seconds(config_.shutdown_timeout));
     StreamTraits<Stream>::shutdown(stream_);
 }
 

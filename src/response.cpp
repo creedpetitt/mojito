@@ -169,22 +169,22 @@ Response& Response::accepted() {
 
 Response& Response::bad_request(const std::string& message) {
     status_code_ = 400;
-    return json({{"error", "Bad Request"}, {"message", message}});
+    return this->json({{"error", "Bad Request"}, {"message", message}});
 }
 
 Response& Response::unauthorized(const std::string& message) {
     status_code_ = 401;
-    return json({{"error", "Unauthorized"}, {"message", message}});
+    return this->json({{"error", "Unauthorized"}, {"message", message}});
 }
 
 Response& Response::forbidden(const std::string& message) {
     status_code_ = 403;
-    return json({{"error", "Forbidden"}, {"message", message}});
+    return this->json({{"error", "Forbidden"}, {"message", message}});
 }
 
 Response& Response::not_found(const std::string& message) {
     status_code_ = 404;
-    return json({{"error", "Not Found"}, {"message", message}});
+    return this->json({{"error", "Not Found"}, {"message", message}});
 }
 
 } // namespace moji

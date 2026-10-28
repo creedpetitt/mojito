@@ -98,22 +98,9 @@ std::expected<T, ParseError> parse_value(std::string_view s) {
     }
 }
 
-/**
- * @brief Compatibility wrapper for APIs that still surface parse failures as HTTP 400 exceptions.
- */
-template<typename T>
-T convert_string(std::string_view s) {
-    auto parsed = parse_value<T>(s);
-    if (!parsed) {
-        throw HttpError(400, parsed.error().message);
-    }
-    return std::move(*parsed);
-}
-
 } // namespace moji::util
 
 namespace moji {
     using util::to_string_param;
     using util::parse_value;
-    using util::convert_string;
 }
