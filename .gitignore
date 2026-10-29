@@ -25,3 +25,6 @@ Thumbs.db
 .cache/neocmakelsp/tree_map_cache.json
 .cache/neocmakelsp/project_jumpitems_cache.json
 skills/system/run-workflow/SKILL.md
+tmp/raw-beast/CMakeLists.txt
+tmp/raw-beast/README.md
+tmp/raw-beast/main.cpp

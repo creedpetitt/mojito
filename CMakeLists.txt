@@ -6,6 +6,7 @@ include(CMakePackageConfigHelpers)
 include(cmake/MojiDependencies.cmake)
 
 if(PROJECT_IS_TOP_LEVEL)
+  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
   set(moji_DEFAULT_INSTALL ON)
 else()
   set(moji_DEFAULT_INSTALL OFF)

@@ -7,7 +7,9 @@
 
 #include <boost/beast/http/file_body.hpp>
 
+#include <exception>
 #include <iostream>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -28,6 +30,45 @@ struct StreamTraits {
 };
 
 namespace {
+
+struct ErrorResponse {
+    http::status status;
+    std::string message;
+};
+
+// No response is needed for a normal disconnect, timeout, or cancellation.
+std::optional<ErrorResponse> read_error_response(const beast::error_code& ec) {
+    if (ec == http::error::end_of_stream ||
+        ec == net::error::connection_reset || ec == net::error::eof ||
+        ec == beast::error::timeout || ec == net::error::operation_aborted) {
+        return std::nullopt;
+    }
+
+    if (ec == http::error::body_limit) {
+        return ErrorResponse{http::status::payload_too_large, "Payload Too Large"};
+    }
+
+    std::cerr << "Request Parse Error: " << ec.message() << "\n";
+    return ErrorResponse{http::status::bad_request, "Bad Request"};
+}
+
+// Classify only failures escaping the dispatcher; unknown exceptions propagate
+// to the connection boundary. A system error closes without another write.
+std::optional<ErrorResponse> handler_error_response(std::exception_ptr error) {
+    try {
+        std::rethrow_exception(error);
+    } catch (const HttpError& e) {
+        return ErrorResponse{static_cast<http::status>(e.status()), e.what()};
+    } catch (const boost::system::system_error& e) {
+        if (e.code() != net::error::operation_aborted) {
+            std::cerr << "Async Handler Error: " << e.what() << "\n";
+        }
+        return std::nullopt;
+    } catch (const std::exception& e) {
+        std::cerr << "Async Handler Error: " << e.what() << "\n";
+        return ErrorResponse{http::status::internal_server_error, "Internal Server Error"};
+    }
+}
 
 Request make_request(http::request<http::string_body>&& req) {
     Request moji_req;
@@ -104,54 +145,6 @@ boost::asio::awaitable<void> write_response(
     co_await http::async_write(stream, res, net::use_awaitable);
 }
 
-template <typename Stream, typename SessionPtr>
-boost::asio::awaitable<void> handle_session(
-    Stream& stream, SessionPtr self,
-    Dispatcher& dispatcher, Request req,
-    const std::string_view client_ip,
-    bool keep_alive, const unsigned version) {
-        
-    Response moji_res;
-    bool error_occurred = false;
-    std::optional<std::pair<http::status, std::string>> pending_error;
-
-    try {
-        moji_res = co_await dispatcher.handle(req, client_ip, keep_alive);
-    } catch (const HttpError& e) {
-        pending_error = std::make_pair(static_cast<http::status>(e.status()), std::string(e.what()));
-        keep_alive = false;
-    } catch (const boost::system::system_error& e) {
-        if (e.code() != net::error::operation_aborted) {
-            std::cerr << "Async Handler Error: " << e.what() << "\n";
-        }
-        error_occurred = true;
-    } catch (const std::exception& e) {
-        std::cerr << "Async Handler Error: " << e.what() << "\n";
-        pending_error = std::make_pair(http::status::internal_server_error, "Internal Server Error");
-        keep_alive = false;
-    }
-
-    if (pending_error) {
-        try {
-            co_await write_error(stream, pending_error->first, pending_error->second, version);
-        } catch (...) {
-            error_occurred = true;
-        }
-    } else {
-        try {
-            co_await write_response(stream, moji_res, keep_alive, version);
-        } catch (...) {
-            error_occurred = true;
-        }
-    }
-
-    if (error_occurred || !keep_alive) {
-        self->shutdown_session();
-    } else {
-        self->start_read();
-    }
-}
-
 } // namespace
 
 template<class Stream>
@@ -166,69 +159,92 @@ HttpSession<Stream>::HttpSession(
 
 template<class Stream>
 void HttpSession<Stream>::run() {
-    net::dispatch(
+    net::co_spawn(
         stream_.get_executor(),
-        beast::bind_front_handler(&HttpSession::start_read, this->shared_from_this()));
+        run_connection(this->shared_from_this()),
+        net::detached);
 }
 
 template<class Stream>
-void HttpSession<Stream>::start_read() {
+void HttpSession<Stream>::prepare_read() {
     parser_.emplace();
-
-    // Set body limit
     parser_->body_limit(config_.max_body_size);
-
-    // Set connection expiration
-    beast::get_lowest_layer(stream_).expires_after(
-        std::chrono::seconds(config_.timeout_seconds)
-    );
-
-    http::async_read(stream_, buffer_, *parser_,
-        beast::bind_front_handler(&HttpSession::read_bytes, this->shared_from_this()));
+    beast::get_lowest_layer(stream_).expires_after(config_.timeout_seconds);
 }
 
 template<class Stream>
-void HttpSession<Stream>::read_bytes(const beast::error_code& ec, std::size_t bytes_transferred) {
-    boost::ignore_unused(bytes_transferred);
+net::awaitable<bool> HttpSession<Stream>::read_request() {
+    prepare_read();
+    beast::error_code ec;
+    co_await http::async_read(
+        stream_, buffer_, *parser_, net::redirect_error(net::use_awaitable, ec));
 
-    if (ec == http::error::end_of_stream) {
-        shutdown_session();
-        return;
+    if (!ec) {
+        co_return true;
     }
 
-    if (ec) {
-        if (ec == http::error::body_limit) {
-            send_error_response(http::status::payload_too_large, "Payload Too Large");
-            return;
+    if (auto error = read_error_response(ec)) {
+        try {
+            co_await write_error(stream_, error->status, error->message, parser_->get().version());
+        } catch (...) {
+            // The peer may have disconnected before the error was written.
         }
-
-        if (ec != net::error::connection_reset && ec != net::error::eof && 
-            ec != beast::error::timeout && ec != net::error::operation_aborted) {
-            std::cerr << "Request Parse Error: " << ec.message() << "\n";
-            send_error_response(http::status::bad_request, "Bad Request");
-            return;
-        }
-        shutdown_session();
-        return;
     }
+    co_return false;
+}
 
+template<class Stream>
+net::awaitable<bool> HttpSession<Stream>::handle_request() {
     auto beast_req = parser_->release();
-    const bool keep_alive = beast_req.keep_alive();
+    bool keep_alive = beast_req.keep_alive();
     const unsigned version = beast_req.version();
+    auto req = make_request(std::move(beast_req));
+    Response moji_res;
+    std::optional<ErrorResponse> pending_error;
 
-    boost::asio::co_spawn(
-        stream_.get_executor(),
-        handle_session(
-            stream_,
-            this->shared_from_this(),
-            dispatcher_,
-            make_request(std::move(beast_req)),
-            std::string_view(client_ip_),
-            keep_alive,
-            version
-        ),
-        boost::asio::detached
-    );
+    try {
+        moji_res = co_await dispatcher_.handle(req, client_ip_, keep_alive);
+    } catch (...) {
+        pending_error = handler_error_response(std::current_exception());
+        if (!pending_error) {
+            co_return false;
+        }
+        keep_alive = false;
+    }
+
+    try {
+        if (pending_error) {
+            co_await write_error(stream_, pending_error->status, pending_error->message, version);
+        } else {
+            co_await write_response(stream_, moji_res, keep_alive, version);
+        }
+    } catch (...) {
+        co_return false;
+    }
+    co_return keep_alive;
+}
+
+template<class Stream>
+net::awaitable<void> HttpSession<Stream>::run_connection(
+    std::shared_ptr<HttpSession<Stream>> self) {
+    // This frame owns the session while its read and handler helpers suspend.
+    try {
+        while (co_await self->read_request()) {
+            if (!co_await self->handle_request()) {
+                break;
+            }
+        }
+    } catch (const boost::system::system_error& e) {
+        if (e.code() != net::error::operation_aborted) {
+            std::cerr << "HTTP Session Error: " << e.what() << "\n";
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "HTTP Session Error: " << e.what() << "\n";
+    } catch (...) {
+        std::cerr << "HTTP Session Error: unknown exception\n";
+    }
+
+    self->shutdown_session();
 }
 
 template<class Stream>
@@ -245,19 +261,6 @@ std::string HttpSession<Stream>::get_client_ip() {
     } catch (...) {
         return "unknown";
     }
-}
-
-template<class Stream>
-void HttpSession<Stream>::send_error_response(http::status status, const std::string_view message) {
-    const unsigned version = parser_ ? parser_->get().version() : 11;
-    auto res = std::make_shared<http::response<http::string_body>>(status, version);
-    res->set(http::field::content_type, "text/plain");
-    res->body() = std::string(message);
-    res->prepare_payload();
-
-    http::async_write(stream_, *res, [self = this->shared_from_this(), res](beast::error_code, std::size_t) {
-        self->shutdown_session();
-    });
 }
 
 template class HttpSession<beast::tcp_stream>;

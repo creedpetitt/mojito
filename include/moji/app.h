@@ -94,6 +94,8 @@ public:
         router_.add_route("POST", path, wrap_handler(handler));
     }
 
+    
+
     /** @brief Registers a PUT route. */
     template<typename Func>
     void put(const std::string& path, Func handler) {

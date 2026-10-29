@@ -22,8 +22,8 @@ int main() {
     // Create and configure the application
     moji::Config cfg = moji::ConfigBuilder()
         .server_name("HelloWorldApp/1.0")
-        .threads(8)
-        .port(8080)
+        .threads(4)
+        .port(6969)
         .build();
 
     App app{cfg};
@@ -91,7 +91,7 @@ int main() {
 
     // Start the server on port 8080
     // This call is blocking and starts the internal thread pool
-    std::println("Starting server on http://localhost:8080");
+    std::println("Starting server on http://localhost:{}", cfg.port);
     app.init();
 
     return 0;

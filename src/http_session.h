@@ -6,9 +6,9 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 
+#include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -35,14 +35,15 @@ namespace moji {
             Stream&& stream);
 
         void run();
-        void start_read();
-        void read_bytes(const beast::error_code& ec, std::size_t bytes_transferred);
-
-        void shutdown_session();
 
     private:
+        static boost::asio::awaitable<void> run_connection(
+            std::shared_ptr<HttpSession<Stream>> self);
+        void prepare_read();
+        boost::asio::awaitable<bool> read_request();
+        boost::asio::awaitable<bool> handle_request();
+        void shutdown_session();
         std::string get_client_ip();
-        void send_error_response(http::status status, std::string_view message);
     };
 
 } // namespace moji

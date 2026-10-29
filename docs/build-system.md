@@ -16,7 +16,7 @@ include(FetchContent)
 
 FetchContent_Declare(
     moji
-    GIT_REPOSITORY https://github.com/Creed-Petitt/moji.git
+    GIT_REPOSITORY https://github.com/creedpetitt/mojito.git
     GIT_TAG        main
 )
 FetchContent_MakeAvailable(moji)

@@ -23,7 +23,7 @@ Install moji as a CMake package, or consume it directly with `FetchContent`.
 
 ```bash
 // YOLO mode
-curl -fsSL https://raw.githubusercontent.com/Creed-Petitt/moji/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/creedpetitt/mojito/main/install.sh | bash
 ```
 
 > **Note:** The installer (`install.sh`) installs only the core build tools.
