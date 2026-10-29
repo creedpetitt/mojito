@@ -72,7 +72,6 @@ public:
      */
     const Config& view_config() const { return config_; }
 
-
     /**
      * @brief Registers a GET route.
      *
@@ -93,8 +92,6 @@ public:
         ensure_configuring("Cannot register POST route");
         router_.add_route("POST", path, wrap_handler(handler));
     }
-
-    
 
     /** @brief Registers a PUT route. */
     template<typename Func>

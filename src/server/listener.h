@@ -17,19 +17,21 @@ using tcp = boost::asio::ip::tcp;
 class Listener : public std::enable_shared_from_this<Listener> {
 public:
     using AcceptHandler = std::function<void(tcp::socket)>;
+    using ExecutorProvider = std::function<net::any_io_executor()>;
 
-private:
-    net::io_context& ioc_;
-    tcp::acceptor acceptor_;
-    AcceptHandler on_accept_;
-
-public:
-    Listener(net::io_context& ioc, const tcp::endpoint& endpoint, AcceptHandler on_accept);
+    Listener(
+        net::any_io_executor executor, 
+        const tcp::endpoint& endpoint,
+        ExecutorProvider next_executor, 
+        AcceptHandler on_accept);
 
     void run();
     void stop() noexcept;
 
 private:
+    tcp::acceptor acceptor_;
+    ExecutorProvider next_executor_;
+    AcceptHandler on_accept_;
     void accept_connection();
     void on_accept(const beast::error_code& ec, tcp::socket socket);
 };

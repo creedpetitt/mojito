@@ -3,6 +3,8 @@
 #include <moji/config.h>
 #include <moji/async.h>
 
+#include "engine_pool.h"
+
 #include <boost/asio.hpp>
 
 #include <functional>
@@ -17,9 +19,9 @@ class Dispatcher;
 class SignalHandler;
 
 class Server {
-    Dispatcher& dispatcher_;
-    const Config& config_;
-    net::io_context ioc_;
+    Dispatcher& dispatcher_; // Owned by app, borrowed by server
+    const Config& config_; // Owned by app, borrowed by server
+    EnginePool engine_; 
     std::shared_ptr<Listener> listener_;
     std::unique_ptr<SignalHandler> signals_;
 
@@ -33,11 +35,10 @@ public:
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
 
-    // App enforces single startup and owns the shutdown-state transitions.
+    // App enforces single startup and owns the shutdown state transitions.
     void init(uint16_t port, int num_threads, std::function<void()> request_stop);
     void stop() noexcept;
     void spawn(Async<void> task);
-    net::io_context& get_engine() { return ioc_; }
 
 private:
     void run(int num_threads);

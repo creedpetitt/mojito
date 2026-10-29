@@ -1,5 +1,6 @@
 #include "listener.h"
 #include "boost/asio/strand.hpp"
+#include "boost/beast/core/error.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -7,10 +8,14 @@
 
 namespace moji {
 
-Listener::Listener(
-    net::io_context& ioc,
-    const tcp::endpoint& endpoint,
-    AcceptHandler on_accept) : ioc_(ioc), acceptor_(net::make_strand(ioc)), on_accept_(std::move(on_accept)) {
+    Listener::Listener(
+        net::any_io_executor executor,
+        const tcp::endpoint& endpoint,
+        ExecutorProvider next_executor,
+        AcceptHandler on_accept)
+        : acceptor_(std::move(executor)),
+          next_executor_(std::move(next_executor)),
+          on_accept_(std::move(on_accept)) {
 
     beast::error_code ec;
 
@@ -33,7 +38,7 @@ void Listener::run() {
 
 void Listener::accept_connection() {
     acceptor_.async_accept(
-        net::make_strand(ioc_),
+        next_executor_(),
         beast::bind_front_handler(&Listener::on_accept, shared_from_this()));
 }
 

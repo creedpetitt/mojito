@@ -44,6 +44,18 @@ namespace moji {
         return *this;
     }
 
+    ConfigBuilder&
+    ConfigBuilder::execution_model(const ExecutionModel mode) {
+        config_.execution_model = mode;
+        return *this;
+    }
+
+    ConfigBuilder&
+    ConfigBuilder::concurrency_model(const IoMode mode) {
+        config_.concurrency_model = mode;
+        return *this;
+    }
+
     Config ConfigBuilder::build() {
         return config_;
     }

@@ -19,7 +19,8 @@ Server::Server(
     Dispatcher& dispatcher,
     const Config& config)
     : dispatcher_(dispatcher),
-      config_(config) {}
+      config_(config),
+      engine_(config.execution_model, config.threads) {}
 
 Server::~Server() {
     stop();
@@ -28,31 +29,33 @@ Server::~Server() {
 void Server::init(const uint16_t port, const int num_threads, std::function<void()> request_stop) {
     try {
         const auto endpoint = tcp::endpoint{tcp::v4(), port};
-
+        
         listener_ = std::make_shared<Listener>(
-            ioc_,
-            endpoint,
+            engine_.listener_executor(), endpoint,
+            [this] {
+                return engine_.next_connection_executor();
+            },
             [this](tcp::socket socket) {
-                if (ioc_.stopped()) {
+                if (engine_.context_for_worker(0).stopped()) {
                     boost::system::error_code ec;
-                    socket.close(ec);
+                    ec = socket.close(ec);
                     return;
                 }
-
-                auto session = std::make_shared<HttpSession<beast::tcp_stream>>(
-                    dispatcher_, config_,
-                    beast::tcp_stream(std::move(socket)));
+                auto session =
+                    std::make_shared<HttpSession<beast::tcp_stream>>(
+                        dispatcher_,
+                        config_,
+                        beast::tcp_stream(std::move(socket)));
                 session->run();
             });
         listener_->run();
-
         signals_ = std::make_unique<SignalHandler>
-            (ioc_, [request_stop = std::move(request_stop)](const int signal_number) {
+            (engine_.context_for_worker(0), 
+                [request_stop = std::move(request_stop)](const int signal_number) {
             std::printf("[moji] Received signal %d, stopping...\n", signal_number);
             request_stop();
         });
         signals_->start();
-        
         run(num_threads);
     } catch (...) {
         cleanup();
@@ -61,33 +64,14 @@ void Server::init(const uint16_t port, const int num_threads, std::function<void
     cleanup();
 }
 
-void Server::stop() noexcept {
-    ioc_.stop();
-}
-
-void Server::cleanup() noexcept {
-    stop();
-    if (signals_) {
-        signals_->cancel();
-        signals_.reset();
-    }
-    if (listener_) {
-        listener_->stop();
-        listener_.reset();
-    }
-}
-
-void Server::spawn(Async<void> task) {
-    net::co_spawn(ioc_.get_executor(), std::move(task), net::detached);
-}
-
 void Server::run(const int num_threads) {
     std::mutex failure_mutex;
     std::exception_ptr failure;
 
-    auto run_loop = [&] {
+    auto run_loop = [&](size_t worker) {
         try {
-            ioc_.run();
+            // Shared Context always returns 0.
+            engine_.context_for_worker(worker).run(); 
         } catch (...) {
             {
                 std::lock_guard lock(failure_mutex);
@@ -103,10 +87,10 @@ void Server::run(const int num_threads) {
     try {
         workers.reserve(num_threads > 1 ? static_cast<size_t>(num_threads - 1) : 0);
         for (int i = 1; i < num_threads; ++i) {
-            workers.emplace_back(run_loop);
+            workers.emplace_back(run_loop, (size_t)i);
         }
 
-        run_loop();
+        run_loop(0);
     } catch (...) {
         stop();
         throw;
@@ -115,6 +99,26 @@ void Server::run(const int num_threads) {
     workers.clear(); // Join before reading failure or cleaning up server objects.
     if (failure) {
         std::rethrow_exception(failure);
+    }
+}
+
+void Server::spawn(Async<void> task) {
+    net::co_spawn(engine_.spawn_task_executor(), std::move(task), net::detached);
+}
+
+void Server::stop() noexcept {
+    engine_.stop();
+}
+
+void Server::cleanup() noexcept {
+    stop();
+    if (signals_) {
+        signals_->cancel();
+        signals_.reset();
+    }
+    if (listener_) {
+        listener_->stop();
+        listener_.reset();
     }
 }
 
