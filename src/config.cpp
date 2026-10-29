@@ -27,11 +27,7 @@ namespace moji {
     }
 
     ConfigBuilder&
-    ConfigBuilder::shutdown(const std::chrono::seconds shutdown_t) {    // ConfigBuilder&
-    // ConfigBuilder::io_mode(const IoMode mode) {
-    //     config_.io_mode = mode;
-    //     return *this;
-    // }
+    ConfigBuilder::shutdown(const std::chrono::seconds shutdown_t) {    
         config_.shutdown_timeout = shutdown_t;
         return *this;
     }
@@ -51,6 +47,12 @@ namespace moji {
     ConfigBuilder&
     ConfigBuilder::execution_model(const ExecutionModel mode) {
         config_.execution_model = mode;
+        return *this;
+    }
+
+    ConfigBuilder& 
+    ConfigBuilder::protocol(const NetworkProtocol protocol) {
+        config_.protocol = protocol;
         return *this;
     }
 

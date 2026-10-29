@@ -37,16 +37,4 @@ std::string url_decode(const std::string_view str) {
     return result;
 }
 
-std::string hex_encode(const std::string_view input) {
-    static constexpr char hex_chars[] = "0123456789abcdef";
-    std::string result;
-    result.resize(input.size() * 2);
-    char* ptr = result.data();
-    for (const unsigned char c : input) {
-        *ptr++ = hex_chars[c >> 4];
-        *ptr++ = hex_chars[c & 0x0f];
-    }
-    return result;
-}
-
 } // namespace moji::util

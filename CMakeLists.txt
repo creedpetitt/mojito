@@ -39,9 +39,9 @@ set(moji_SOURCES
     src/dispatcher.cpp
     src/response.cpp
     src/router.cpp
-    src/server/server.cpp
-    src/server/listener.cpp
-    src/server/engine_pool.cpp
+    src/server.cpp
+    src/listener.cpp
+    src/engine_pool.cpp
     src/signal_handler.cpp
     src/util/string.cpp
 )

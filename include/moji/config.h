@@ -13,11 +13,10 @@ enum class ExecutionModel {
     SharedContext = 1
 };
 
-// enum class IoMode {
-//     Auto = 0, 
-//     Sync = 1, 
-//     Async = 2
-// };
+enum class NetworkProtocol {
+    HTTP = 0, // Default
+    HTTPS = 1
+};
 
 struct Config {
     uint16_t port{8080};
@@ -28,7 +27,7 @@ struct Config {
     std::string server_name{"mojito/0.1.0"};
     bool expose_client_ip{false};
     ExecutionModel execution_model{ExecutionModel::PerWorker};
-    // IoMode io_mode{IoMode::Async};
+    NetworkProtocol protocol{NetworkProtocol::HTTP};
 };
 
 class ConfigBuilder {
@@ -41,7 +40,8 @@ public:
     ConfigBuilder& server_name(std::string_view);
     ConfigBuilder& expose_client_ip(bool enabled = false);
     ConfigBuilder& execution_model(ExecutionModel);
-    // ConfigBuilder& io_mode(IoMode);    
+    ConfigBuilder& protocol(NetworkProtocol);
+    
     Config build();
 
 private:

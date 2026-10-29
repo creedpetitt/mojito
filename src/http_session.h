@@ -23,6 +23,8 @@ namespace moji {
     class HttpSession : public std::enable_shared_from_this<HttpSession<Stream>> {
         Stream stream_;
         beast::flat_buffer buffer_;
+        // Reused only after the preceding response write has completed.
+        std::string response_buffer_;
         std::optional<http::request_parser<http::string_body>> parser_;
         Dispatcher& dispatcher_;
         const Config& config_;

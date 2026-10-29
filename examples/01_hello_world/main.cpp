@@ -12,19 +12,43 @@
 
 #include <moji/app.h>
 #include <print>
+#include <charconv>
+#include <cstdlib>
+#include <iostream>
+#include <stdexcept>
+#include <string_view>
 
 #include "../../include/moji/config.h"
+#include "moji/request.h"
 
 using namespace moji;
 
+namespace {
+int environment_number(const char* name, int fallback, int maximum) {
+    const char* raw = std::getenv(name);
+    if (!raw) return fallback;
+    const std::string_view text{raw};
+    int value = 0;
+    const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (ec != std::errc{} || end != text.data() + text.size() || value < 1 || value > maximum)
+        throw std::invalid_argument(std::string(name) + " is out of range");
+    return value;
+}
+}
+
 int main() {
+    try {
+    const char* model_env = std::getenv("MODEL");
+    const std::string_view model = model_env ? model_env : "per-worker";
+    if (model != "per-worker" && model != "shared")
+        throw std::invalid_argument("MODEL must be per-worker or shared");
 
     // Create and configure the application
     moji::Config cfg = moji::ConfigBuilder()
         .server_name("HelloWorldApp/1.0")
-        .threads(8)
-        .port(6969)
-        .execution_model(ExecutionModel::PerWorker)
+        .threads(environment_number("WORKERS", 8, 1024))
+        .port(environment_number("PORT", 16969, 65535))
+        .execution_model(model == "shared" ? ExecutionModel::SharedContext : ExecutionModel::PerWorker)
         .build();
 
     App app{cfg};
@@ -37,8 +61,23 @@ int main() {
         co_return;
     });
 
-    app.get("/api/hello", [](Request& req) -> Async<Json> {
+    app.get("/sync", [](Request& req, Response& res) -> void {
+        res.send("Hello from moji!");
+    });
+
+    app.get("/sync/direct", [](Request& req) -> std::string {
+        return "Hello from moji!";
+    });
+
+    app.get("/json/async", [](Request& req) -> Async<Json> {
         co_return Json{
+            {"message", "Hello from moji"},
+            {"ok", true}
+        };
+    });
+
+    app.get("/json/sync", [](Request& req) -> Json {
+        return Json{
             {"message", "Hello from moji"},
             {"ok", true}
         };
@@ -90,10 +129,13 @@ int main() {
         co_return;
     });
 
-    // Start the server on port 8080
     // This call is blocking and starts the internal thread pool
-    std::println("Starting server on http://localhost:{}", cfg.port);
+    std::println("Moji benchmark: port={}, workers={}, model={}", cfg.port, cfg.threads, model);
     app.init();
 
     return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 }

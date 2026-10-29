@@ -7,6 +7,11 @@
 
 #include <boost/beast/http/file_body.hpp>
 
+#include <boost/asio/write.hpp>
+#include <boost/beast/core/buffers_range.hpp>
+#include <boost/beast/http/serializer.hpp>
+#include <boost/system/system_error.hpp>
+
 #include <exception>
 #include <iostream>
 #include <string_view>
@@ -83,6 +88,36 @@ Request make_request(http::request<http::string_body>&& req) {
     return moji_req;
 }
 
+// Keep HTTP framing in Beast; only change the buffers passed to the timed stream.
+// Bound additional body buffering and leave large/file responses on the old path.
+constexpr std::size_t max_flat_response_body = 64 * 1024;
+constexpr std::size_t max_retained_response_buffer = 128 * 1024;
+
+void flatten_response(
+    http::response<http::string_body>& response,
+    std::string& wire) {
+    http::response_serializer<http::string_body> serializer{response};
+    wire.clear();
+    wire.reserve(256 + response.body().size());
+
+    while (!serializer.is_done()) {
+        beast::error_code ec;
+        serializer.next(ec, [&](beast::error_code&, const auto& buffers) {
+            std::size_t copied = 0;
+            for (auto buffer : beast::buffers_range_ref(buffers)) {
+                wire.append(static_cast<const char*>(buffer.data()), buffer.size());
+                copied += buffer.size();
+            }
+            if (copied != 0) {
+                serializer.consume(copied);
+            }
+        });
+        if (ec) {
+            throw boost::system::system_error(ec);
+        }
+    }
+}
+
 template <typename Stream>
 boost::asio::awaitable<void> write_error(
     Stream& stream,
@@ -100,6 +135,7 @@ template <typename Stream>
 boost::asio::awaitable<void> write_response(
     Stream& stream,
     Response& moji_res,
+    std::string& response_buffer,
     const bool keep_alive,
     const unsigned version = 11) {
         
@@ -142,6 +178,16 @@ boost::asio::awaitable<void> write_response(
     res.body() = moji_res.take_body();
     res.keep_alive(keep_alive);
     res.prepare_payload();
+    if (res.body().size() <= max_flat_response_body) {
+        // The session owns this buffer, and its next request waits for this write.
+        flatten_response(res, response_buffer);
+        co_await net::async_write(stream, net::buffer(response_buffer), net::use_awaitable);
+        // Do not retain an unusually large allocation caused by response headers.
+        if (response_buffer.capacity() > max_retained_response_buffer) {
+            std::string{}.swap(response_buffer);
+        }
+        co_return;
+    }
     co_await http::async_write(stream, res, net::use_awaitable);
 }
 
@@ -216,7 +262,7 @@ net::awaitable<bool> HttpSession<Stream>::handle_request() {
         if (pending_error) {
             co_await write_error(stream_, pending_error->status, pending_error->message, version);
         } else {
-            co_await write_response(stream_, moji_res, keep_alive, version);
+            co_await write_response(stream_, moji_res, response_buffer_, keep_alive, version);
         }
     } catch (...) {
         co_return false;

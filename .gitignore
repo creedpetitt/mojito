@@ -23,5 +23,6 @@ Thumbs.db
 .cache/neocmakelsp/project_completions_cache.json
 .cache/neocmakelsp/tree_map_cache.json
 .cache/neocmakelsp/project_jumpitems_cache.json
-bench/
+
 skills/
+bench/

@@ -29,22 +29,6 @@ struct ParseError {
  */
 std::string url_decode(std::string_view str);
 
-/**
- * @brief Converts a binary string or buffer to a hex-encoded string.
- */
-std::string hex_encode(std::string_view input);
-
-/**
- * @brief Converts various types to string for route/query parameter handling.
- */
-template<typename T>
-std::string to_string_param(const T& val) {
-    if constexpr (std::is_same_v<T, std::string>) return val;
-    else if constexpr (std::is_constructible_v<std::string, T>) return std::string(val);
-    else if constexpr (std::is_same_v<T, bool>) return val ? "true" : "false";
-    else return std::to_string(val);
-}
-
 template<typename T>
 std::expected<T, ParseError> parse_value(std::string_view s) {
     using PureT = std::remove_cvref_t<T>;
@@ -101,6 +85,6 @@ std::expected<T, ParseError> parse_value(std::string_view s) {
 } // namespace moji::util
 
 namespace moji {
-    using util::to_string_param;
+
     using util::parse_value;
 }

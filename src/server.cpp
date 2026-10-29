@@ -1,9 +1,9 @@
 #include "server.h"
 #include "boost/beast/core/tcp_stream.hpp"
 #include "listener.h"
-#include "../http_session.h"
-#include "../dispatcher.h"
-#include "../signal_handler.h"
+#include "http_session.h"
+#include "dispatcher.h"
+#include "signal_handler.h"
 
 #include <cstdint>
 #include <cstdio>

@@ -4,7 +4,7 @@
 #include <functional>
 
 #include "dispatcher.h"
-#include "server/server.h"
+#include "server.h"
 
 namespace moji {
 
