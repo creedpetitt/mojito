@@ -1,5 +1,6 @@
 #include <moji/router.h>
-#include <moji/util/string.h>
+
+#include "url.h"
 
 #include <utility>
 
@@ -71,7 +72,7 @@ bool match_segments(
 
         if (!route_segment.empty() && route_segment.front() == ':') {
             const std::string name = route_segment.substr(1);
-            params[name] = util::url_decode(request_segment);
+            params[name] = detail::decode_path_segment(request_segment);
             continue;
         }
 

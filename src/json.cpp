@@ -1,5 +1,5 @@
 #include <moji/json.h>
-#include <boost/json/src.hpp>
+#include <boost/json.hpp>
 
 #include <limits>
 
@@ -120,12 +120,12 @@ Json Json::array(std::initializer_list<Json> items) {
     return json;
 }
 
-std::expected<Json, util::ParseError> Json::parse(std::string_view text) {
+std::expected<Json, ParseError> Json::parse(std::string_view text) {
     boost::system::error_code ec;
     auto value = boost::json::parse(text, ec);
     if (ec) {
-        return std::unexpected(util::ParseError{
-            util::ParseErrorCode::Invalid,
+        return std::unexpected(ParseError{
+            ParseErrorCode::Invalid,
             "Invalid JSON: " + ec.message()
         });
     }

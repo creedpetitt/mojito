@@ -1,7 +1,7 @@
 #pragma once
 
 #include <moji/exceptions.h>
-#include <moji/util/string.h>
+#include <moji/parse_error.h>
 
 #include <concepts>
 #include <cstdint>
@@ -71,7 +71,7 @@ public:
         return array({Json(std::forward<Args>(args))...});
     }
 
-    static std::expected<Json, util::ParseError> parse(std::string_view text);
+    static std::expected<Json, ParseError> parse(std::string_view text);
 
     Type type() const noexcept;
     bool is_null() const noexcept;

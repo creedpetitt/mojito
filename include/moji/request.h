@@ -2,7 +2,7 @@
 
 #include <moji/json.h>
 #include <moji/header.h>
-#include <moji/util/string.h>
+#include <moji/parameter.h>
 
 #include <any>
 #include <expected>
@@ -35,8 +35,6 @@ public:
     bool has_header(std::string_view key) const;
     const std::vector<Header>& headers() const { return headers_; }
 
-    static std::string url_decode(std::string_view str);
-
     const ParamMap& params() const noexcept { return params_; }
     const ParamMap& query_params() const noexcept { return query_params_; }
 
@@ -45,7 +43,7 @@ public:
     template<typename T>
     T param(std::string_view key) const {
         const auto value = param(key);
-        auto parsed = util::parse_value<T>(value);
+        auto parsed = detail::parse_parameter<T>(value);
         if (!parsed) {
             throw HttpError(400, parsed.error().message);
         }
@@ -61,7 +59,7 @@ public:
             return std::nullopt;
         }
 
-        auto parsed = util::parse_value<T>(*value);
+        auto parsed = detail::parse_parameter<T>(*value);
         if (!parsed) {
             throw HttpError(400, parsed.error().message);
         }
@@ -77,7 +75,7 @@ public:
         return std::move(*value);
     }
 
-    std::expected<Json, util::ParseError> try_json() const;
+    std::expected<Json, ParseError> try_json() const;
     Json json() const;
 
     template<typename T>

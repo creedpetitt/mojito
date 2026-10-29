@@ -1,6 +1,7 @@
 #include <moji/exceptions.h>
 #include <moji/request.h>
-#include <moji/util/string.h>
+
+#include "url.h"
 
 #include <algorithm>
 #include <cctype>
@@ -17,35 +18,23 @@ bool header_name_equal(const std::string_view lhs, const std::string_view rhs) {
            });
 }
 
-std::unordered_map<std::string, std::string> parse_query_params(std::string_view query) {
-    std::unordered_map<std::string, std::string> params;
-    size_t pos = 0;
-    while (pos < query.size()) {
-        const size_t amp = query.find('&', pos);
-        const std::string_view pair = query.substr(pos, amp - pos);
-        const size_t eq = pair.find('=');
-        if (eq != std::string_view::npos) {
-            params[util::url_decode(pair.substr(0, eq))] = util::url_decode(pair.substr(eq + 1));
-        }
-        if (amp == std::string_view::npos) break;
-        pos = amp + 1;
-    }
-    return params;
-}
-
 } // namespace
 
 void Request::set_target(std::string_view target) {
-    query_params_.clear();
+    const auto parsed = detail::parse_request_target(target);
+    const auto encoded_path = parsed.encoded_path();
+    std::string path(encoded_path.data(), encoded_path.size());
+    ParamMap query_params;
 
-    const size_t query_pos = target.find('?');
-    if (query_pos == std::string_view::npos) {
-        path_ = std::string(target);
-        return;
+    for (auto param : parsed.params()) {
+        // Preserve the existing policy: ignore keys without '=', last value wins.
+        if (param.has_value) {
+            query_params.insert_or_assign(std::move(param.key), std::move(param.value));
+        }
     }
 
-    path_ = std::string(target.substr(0, query_pos));
-    query_params_ = parse_query_params(target.substr(query_pos + 1));
+    path_ = std::move(path);
+    query_params_ = std::move(query_params);
 }
 
 void Request::set_method(const std::string_view method) {
@@ -91,10 +80,6 @@ bool Request::has_header(std::string_view key) const {
     });
 }
 
-std::string Request::url_decode(const std::string_view str) {
-    return util::url_decode(str);
-}
-
 std::string_view Request::param(std::string_view key) const {
     const auto it = params_.find(std::string(key));
     if (it == params_.end()) {
@@ -111,7 +96,7 @@ std::optional<std::string_view> Request::query(std::string_view key) const {
     return it->second;
 }
 
-std::expected<Json, util::ParseError> Request::try_json() const {
+std::expected<Json, ParseError> Request::try_json() const {
     return Json::parse(body_);
 }
 

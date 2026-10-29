@@ -244,11 +244,11 @@ net::awaitable<bool> HttpSession<Stream>::handle_request() {
     auto beast_req = parser_->release();
     bool keep_alive = beast_req.keep_alive();
     const unsigned version = beast_req.version();
-    auto req = make_request(std::move(beast_req));
     Response moji_res;
     std::optional<ErrorResponse> pending_error;
 
     try {
+        auto req = make_request(std::move(beast_req));
         moji_res = co_await dispatcher_.handle(req, client_ip_, keep_alive);
     } catch (...) {
         pending_error = handler_error_response(std::current_exception());
