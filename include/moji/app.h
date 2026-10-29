@@ -139,23 +139,34 @@ private:
     // Adapts synchronous and asynchronous callables to the common Handler type.
     template<typename Func>
     Handler wrap_handler(Func handler) {
-        using ReturnType = function_traits<Func>::return_type;
+        using ReturnType = typename function_traits<Func>::return_type;
         using AsyncInfo = async_result<ReturnType>;
-
-        return [handler = std::move(handler)](Request& req, Response& res) mutable -> Async<void> {
-            if constexpr (AsyncInfo::is_async) {
-                if constexpr (std::is_void_v<typename AsyncInfo::type>) {
-                    co_await inject_and_call(handler, req, res); // Async + void
-                } else {
-                    send_handler_result(res, co_await inject_and_call(handler, req, res)); // Async + return
+    
+        if constexpr (AsyncInfo::is_async) {
+            return AsyncHandler{
+                [handler = std::move(handler)]
+                (Request& req, Response& res) mutable -> Async<void> {
+                    if constexpr (std::is_void_v<typename AsyncInfo::type>) {
+                        co_await inject_and_call(handler, req, res);
+                    } else {
+                        send_handler_result(
+                            res, co_await inject_and_call(handler, req, res));
+                    }
+                    co_return;
                 }
-            } else if constexpr (std::is_void_v<ReturnType>) {
-                inject_and_call(handler, req, res); // Sync + void
-            } else {
-                send_handler_result(res, inject_and_call(handler, req, res)); // Sync + return 
-            }
-            co_return;
-        };
+            };
+        } else {
+            return SyncHandler{
+                [handler = std::move(handler)]
+                (Request& req, Response& res) mutable -> void {
+                    if constexpr (std::is_void_v<ReturnType>) {
+                        inject_and_call(handler, req, res);
+                    } else {
+                        send_handler_result(res, inject_and_call(handler, req, res));
+                    }
+                }
+            };
+        }
     }
 };
 } // namespace moji

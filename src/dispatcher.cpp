@@ -7,9 +7,8 @@
 namespace moji {
 
 namespace {
-    Async<void> not_found_handler(Request&, Response& resp) {
+    void not_found_handler(Request&, Response& resp) {
         resp.status(404).send("404 Not Found\n");
-        co_return;
     }
         
     const Handler& not_found() {
@@ -35,7 +34,11 @@ Async<void> Dispatcher::run_middleware(
             co_await run_middleware(index + 1, req, res, final_handler);
         });
     } else {
-        co_await final_handler(req, res);
+        if (const auto* sync = std::get_if<SyncHandler>(&final_handler)) {
+            (*sync)(req, res);
+        } else {
+            co_await std::get<AsyncHandler>(final_handler)(req, res);
+        }
     }
 }
 

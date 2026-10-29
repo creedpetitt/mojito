@@ -47,14 +47,12 @@ void Listener::on_accept(const beast::error_code& ec, tcp::socket socket) {
         if (ec == net::error::operation_aborted) {
             return;
         }
-
         if (ec != net::error::bad_descriptor && ec != net::error::invalid_argument) {
             std::cerr << "accept error: " << ec.message() << std::endl;
         }
     } else {
         on_accept_(std::move(socket));
     }
-
     if (acceptor_.is_open()) {
         accept_connection();
     }

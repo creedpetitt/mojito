@@ -1,6 +1,5 @@
 #pragma once
 
-#include "moji/async.h"
 #include <cstdint>
 #include <cstddef>
 #include <chrono>
@@ -14,11 +13,11 @@ enum class ExecutionModel {
     SharedContext = 1
 };
 
-enum class IoMode {
-    Auto = 0, // Dynamic
-    Sync = 1, 
-    Async = 2
-};
+// enum class IoMode {
+//     Auto = 0, 
+//     Sync = 1, 
+//     Async = 2
+// };
 
 struct Config {
     uint16_t port{8080};
@@ -29,7 +28,7 @@ struct Config {
     std::string server_name{"mojito/0.1.0"};
     bool expose_client_ip{false};
     ExecutionModel execution_model{ExecutionModel::PerWorker};
-    IoMode io_mode{IoMode::Async};
+    // IoMode io_mode{IoMode::Async};
 };
 
 class ConfigBuilder {
@@ -42,7 +41,7 @@ public:
     ConfigBuilder& server_name(std::string_view);
     ConfigBuilder& expose_client_ip(bool enabled = false);
     ConfigBuilder& execution_model(ExecutionModel);
-    ConfigBuilder& io_mode(IoMode);    
+    // ConfigBuilder& io_mode(IoMode);    
     Config build();
 
 private:

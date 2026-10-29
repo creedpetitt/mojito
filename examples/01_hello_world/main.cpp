@@ -25,7 +25,6 @@ int main() {
         .threads(8)
         .port(6969)
         .execution_model(ExecutionModel::PerWorker)
-        .io_mode(IoMode::Async)
         .build();
 
     App app{cfg};
