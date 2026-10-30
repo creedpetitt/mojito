@@ -4,7 +4,12 @@
   "dependencies": [
     "boost-beast",
     "boost-json",
-    "boost-url",
-    "openssl"
-  ]
+    "boost-url"
+  ],
+  "features": {
+    "tls": {
+      "description": "OpenSSL dependencies for HTTPS support",
+      "dependencies": ["openssl"]
+    }
+  }
 }

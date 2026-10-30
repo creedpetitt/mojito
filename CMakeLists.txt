@@ -14,6 +14,7 @@ endif()
 
 option(
   moji_INSTALL "Generate install rules for moji" ${moji_DEFAULT_INSTALL})
+option(moji_ENABLE_TLS "Enable OpenSSL dependencies for HTTPS support" OFF)
 
 moji_setup_boost()
 find_package(Threads REQUIRED)
@@ -48,6 +49,15 @@ target_link_libraries(moji_core
     PUBLIC Boost::headers Boost::system Threads::Threads
     PRIVATE Boost::json Boost::url
 )
+
+target_compile_definitions(moji_core PRIVATE
+    MOJI_ENABLE_TLS=$<BOOL:${moji_ENABLE_TLS}>
+)
+
+if(moji_ENABLE_TLS)
+  find_package(OpenSSL REQUIRED COMPONENTS SSL)
+  target_link_libraries(moji_core PRIVATE OpenSSL::SSL)
+endif()
 
 if(moji_INSTALL)
   install(

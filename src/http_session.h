@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/asio/awaitable.hpp>
 #include <moji/config.h>
 
 #include <boost/asio.hpp>
@@ -12,6 +13,7 @@
 
 namespace beast = boost::beast;
 namespace http = beast::http;
+namespace net = boost::asio;
 
 using tcp = boost::asio::ip::tcp;
 
@@ -39,11 +41,12 @@ namespace moji {
         void run();
 
     private:
-        static boost::asio::awaitable<void> run_connection(
+        static net::awaitable<void> run_connection(
             std::shared_ptr<HttpSession<Stream>> self);
         void prepare_read();
-        boost::asio::awaitable<bool> read_request();
-        boost::asio::awaitable<bool> handle_request();
+        net::awaitable<bool> read_request();
+        net::awaitable<bool> handle_request();
+        net::awaitable<void> upgrade_to_https();
         void shutdown_session();
         std::string get_client_ip();
     };

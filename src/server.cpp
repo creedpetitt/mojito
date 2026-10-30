@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <exception>
 #include <mutex>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -28,6 +29,15 @@ Server::~Server() {
 
 void Server::init(const uint16_t port, const int num_threads, std::function<void()> request_stop) {
     try {
+        if (config_.protocol == NetworkProtocol::HTTPS) {
+#if MOJI_ENABLE_TLS
+            // Replace this branch with TLS setup when HTTPS sessions are implemented.
+            throw std::logic_error("TLS dependencies are enabled, but HTTPS sessions are not implemented yet.");
+#else
+            throw std::logic_error("HTTPS requires rebuilding moji with moji_ENABLE_TLS=ON.");
+#endif
+        }
+
         const auto endpoint = tcp::endpoint{tcp::v4(), port};
         
         listener_ = std::make_shared<Listener>(

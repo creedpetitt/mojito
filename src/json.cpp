@@ -130,7 +130,7 @@ std::expected<Json, ParseError> Json::parse(std::string_view text) {
         });
     }
 
-    Json json;
+    Json json;oost::json::serialize
     json.impl_->value = std::move(value);
     return json;
 }
