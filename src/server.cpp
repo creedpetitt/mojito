@@ -1,5 +1,4 @@
 #include "server.h"
-#include "boost/beast/core/tcp_stream.hpp"
 #include "listener.h"
 #include "http_session.h"
 #include "dispatcher.h"
@@ -13,6 +12,8 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
+namespace net = boost::asio;
 
 namespace moji {
 
@@ -31,10 +32,9 @@ void Server::init(const uint16_t port, const int num_threads, std::function<void
     try {
         if (config_.protocol == NetworkProtocol::HTTPS) {
 #if MOJI_ENABLE_TLS
-            // Replace this branch with TLS setup when HTTPS sessions are implemented.
-            throw std::logic_error("TLS dependencies are enabled, but HTTPS sessions are not implemented yet.");
+    configure_tls();
 #else
-            throw std::logic_error("HTTPS requires rebuilding moji with moji_ENABLE_TLS=ON.");
+    throw std::logic_error("HTTPS requires rebuilding moji with moji_ENABLE_TLS=ON.");
 #endif
         }
 
@@ -51,11 +51,25 @@ void Server::init(const uint16_t port, const int num_threads, std::function<void
                     ec = socket.close(ec);
                     return;
                 }
-                auto session =
-                    std::make_shared<HttpSession<beast::tcp_stream>>(
+#if MOJI_ENABLE_TLS
+                if (config_.protocol == NetworkProtocol::HTTPS) {
+                    auto session = std::make_shared<HttpSession<TlsStream>>(
                         dispatcher_,
                         config_,
-                        beast::tcp_stream(std::move(socket)));
+                        TlsStream{
+                            HttpStream{std::move(socket)},
+                            *tls_context_
+                        });
+                
+                    session->run();
+                    return;
+                }
+#endif
+                auto session =
+                    std::make_shared<HttpSession<HttpStream>>(
+                        dispatcher_,
+                        config_,
+                        HttpStream(std::move(socket)));
                 session->run();
             });
         listener_->run();
@@ -73,6 +87,32 @@ void Server::init(const uint16_t port, const int num_threads, std::function<void
     }
     cleanup();
 }
+
+#if MOJI_ENABLE_TLS
+void Server::configure_tls() {
+    auto context = std::make_unique<net::ssl::context>(net::ssl::context::tls_server);
+    context->set_options(
+        net::ssl::context::default_workarounds
+        | net::ssl::context::no_sslv2
+        | net::ssl::context::no_sslv3
+        | net::ssl::context::no_tlsv1
+        | net::ssl::context::no_tlsv1_1);
+
+    // Example paths until certificate/key settings are added to Config.
+    if (config_.certificate_chain_file.empty() ||
+        config_.private_key_file.empty()) {
+        throw std::invalid_argument(
+            "HTTPS requires certificate-chain and private-key paths");
+    }
+    
+    context->use_certificate_chain_file(config_.certificate_chain_file);
+    context->use_private_key_file(
+        config_.private_key_file,
+        net::ssl::context::pem);
+
+    tls_context_ = std::move(context);
+}
+#endif
 
 void Server::run(const int num_threads) {
     std::mutex failure_mutex;

@@ -56,12 +56,18 @@ namespace moji {
         return *this;
     }
 
-    // ConfigBuilder&
-    // ConfigBuilder::io_mode(const IoMode mode) {
-    //     config_.io_mode = mode;
-    //     return *this;
-    // }
-
+    ConfigBuilder&
+    ConfigBuilder::certificate_chain_file(std::string_view certificate) {
+        config_.certificate_chain_file = certificate;
+        return *this;
+    }
+    
+    ConfigBuilder&
+    ConfigBuilder::private_key_file(std::string_view private_key) {
+        config_.private_key_file = private_key;
+        return *this;
+    }
+    
     Config ConfigBuilder::build() {
         return config_;
     }

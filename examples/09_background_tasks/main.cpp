@@ -35,7 +35,7 @@ int main() {
     });
 
     std::cout << "Background task demo running on :8080" << std::endl;
-    app.listen(8080);
+    app.init();
 
     return 0;
 }

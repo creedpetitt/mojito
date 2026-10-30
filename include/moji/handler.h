@@ -11,7 +11,6 @@ namespace moji {
 
 using AsyncHandler = std::function<Async<void>(Request&, Response&)>;
 using SyncHandler = std::function<void(Request&, Response&)>;
-
 using Handler = std::variant<AsyncHandler, SyncHandler>;
 
 } // namespace moji

@@ -5,17 +5,16 @@
 #include <moji/request.h>
 #include <moji/response.h>
 
-#include <boost/beast/http/file_body.hpp>
 
-#include <boost/asio/write.hpp>
-#include <boost/beast/core/buffers_range.hpp>
-#include <boost/beast/http/serializer.hpp>
+#include <boost/asio.hpp>
+#include <boost/beast.hpp>
 #include <boost/system/system_error.hpp>
 
 #include <exception>
 #include <iostream>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 namespace net = boost::asio;
@@ -49,6 +48,12 @@ std::optional<ErrorResponse> read_error_response(const beast::error_code& ec) {
         return std::nullopt;
     }
 
+    #if MOJI_ENABLE_TLS
+        if (ec == net::ssl::error::stream_truncated) {
+            return std::nullopt;
+        }
+    #endif
+    
     if (ec == http::error::body_limit) {
         return ErrorResponse{http::status::payload_too_large, "Payload Too Large"};
     }
@@ -275,11 +280,13 @@ net::awaitable<void> HttpSession<Stream>::run_connection(
     std::shared_ptr<HttpSession<Stream>> self) {
     // This frame owns the session while its read and handler helpers suspend.
     try {
+        co_await self->handshake();
         while (co_await self->read_request()) {
             if (!co_await self->handle_request()) {
                 break;
             }
         }
+        co_await self->shutdown_session();
     } catch (const boost::system::system_error& e) {
         if (e.code() != net::error::operation_aborted) {
             std::cerr << "HTTP Session Error: " << e.what() << "\n";
@@ -289,15 +296,35 @@ net::awaitable<void> HttpSession<Stream>::run_connection(
     } catch (...) {
         std::cerr << "HTTP Session Error: unknown exception\n";
     }
-
-    self->shutdown_session();
+    StreamTraits<Stream>::shutdown(self->stream_);
 }
 
 template<class Stream>
-void HttpSession<Stream>::shutdown_session() {
-    beast::get_lowest_layer(stream_).
-        expires_after(std::chrono::seconds(config_.shutdown_timeout));
-    StreamTraits<Stream>::shutdown(stream_);
+net::awaitable<void> HttpSession<Stream>::shutdown_session() {
+#if MOJI_ENABLE_TLS
+    if constexpr (std::is_same_v<Stream, TlsStream>) {
+        auto& transport = beast::get_lowest_layer(stream_);
+        if (!transport.socket().is_open()) {
+            co_return;
+        }
+
+        transport.expires_after(config_.shutdown_timeout);
+
+        beast::error_code ec;
+        co_await stream_.async_shutdown(
+            net::redirect_error(net::use_awaitable, ec));
+
+        if (ec &&
+            ec != net::error::eof &&
+            ec != net::ssl::error::stream_truncated &&
+            ec != net::error::operation_aborted &&
+            ec != beast::error::timeout) {
+            std::cerr << "TLS Shutdown Error: "
+                      << ec.message() << "\n";
+        }
+    }
+#endif
+    co_return;
 }
 
 template<class Stream>
@@ -309,6 +336,25 @@ std::string HttpSession<Stream>::get_client_ip() {
     }
 }
 
-template class HttpSession<beast::tcp_stream>;
+template<class Stream>
+net::awaitable<void> HttpSession<Stream>::handshake() {
+#if MOJI_ENABLE_TLS
+    if constexpr (std::is_same_v<Stream, TlsStream>) {
+        beast::get_lowest_layer(stream_)
+            .expires_after(config_.timeout_seconds);
+
+        co_await stream_.async_handshake(
+            net::ssl::stream_base::server,
+            net::use_awaitable);
+    }
+#endif
+    co_return;
+}
+
+template class HttpSession<HttpStream>;
+
+#if MOJI_ENABLE_TLS
+template class HttpSession<TlsStream>;
+#endif
 
 } // namespace moji

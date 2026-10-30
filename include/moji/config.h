@@ -28,6 +28,8 @@ struct Config {
     bool expose_client_ip{false};
     ExecutionModel execution_model{ExecutionModel::PerWorker};
     NetworkProtocol protocol{NetworkProtocol::HTTP};
+    std::string certificate_chain_file;
+    std::string private_key_file;
 };
 
 class ConfigBuilder {
@@ -41,6 +43,8 @@ public:
     ConfigBuilder& expose_client_ip(bool enabled = false);
     ConfigBuilder& execution_model(ExecutionModel);
     ConfigBuilder& protocol(NetworkProtocol);
+    ConfigBuilder& certificate_chain_file(const std::string_view certficate);
+    ConfigBuilder& private_key_file(const std::string_view private_key);
     
     Config build();
 

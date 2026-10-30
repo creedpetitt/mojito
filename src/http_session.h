@@ -1,11 +1,14 @@
 #pragma once
 
-#include <boost/asio/awaitable.hpp>
 #include <moji/config.h>
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+
+#if MOJI_ENABLE_TLS
+#include <boost/beast/ssl.hpp>
+#endif
 
 #include <memory>
 #include <optional>
@@ -18,7 +21,13 @@ namespace net = boost::asio;
 using tcp = boost::asio::ip::tcp;
 
 namespace moji {
-    
+
+using HttpStream = beast::tcp_stream;
+
+#if MOJI_ENABLE_TLS
+using TlsStream = beast::ssl_stream<HttpStream>;
+#endif
+
     class Dispatcher;
 
     template <class Stream>
@@ -46,8 +55,8 @@ namespace moji {
         void prepare_read();
         net::awaitable<bool> read_request();
         net::awaitable<bool> handle_request();
-        net::awaitable<void> upgrade_to_https();
-        void shutdown_session();
+        net::awaitable<void> handshake();
+        net::awaitable<void> shutdown_session();
         std::string get_client_ip();
     };
 
