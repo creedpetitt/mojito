@@ -1,5 +1,5 @@
 CompileFlags:
-  CompilationDatabase: build/vcpkg-debug
+  CompilationDatabase: build/vcpkg-release
   Add: [-std=c++23]
 ---
 If:

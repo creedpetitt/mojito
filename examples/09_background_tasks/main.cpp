@@ -1,41 +1,47 @@
-/**
- * Example 09: Background Tasks
- * 
- * This example demonstrates how to run asynchronous tasks in the background.
- * Concepts:
- * - app.spawn() for background coroutines
- * - moji::delay() for non-blocking timers
- * - Periodic background work
- */
-
 #include <moji/app.h>
+
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/this_coro.hpp>
+#include <boost/asio/use_awaitable.hpp>
+
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <exception>
 #include <iostream>
+#include <memory>
 
-using namespace moji;
+namespace {
 
-// A background worker that runs every 10 seconds without blocking the server.
-Async<void> status_monitor() {
-    int tick = 0;
-    while (true) {
-        std::cout << "[Monitor] background tick " << ++tick << std::endl;
-        co_await moji::delay(std::chrono::seconds(10));
+moji::Async<void> monitor(std::shared_ptr<std::atomic<std::uint64_t>> ticks) {
+    const auto executor = co_await boost::asio::this_coro::executor;
+    boost::asio::steady_timer timer{executor};
+
+    for (;;) {
+        timer.expires_after(std::chrono::seconds(10));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+        const auto tick = ticks->fetch_add(1, std::memory_order_relaxed) + 1;
+        std::cout << "[monitor] tick " << tick << '\n';
     }
 }
 
+} // namespace
+
 int main() {
-    App app;
+    try {
+        auto ticks = std::make_shared<std::atomic<std::uint64_t>>(0);
+        moji::App app{moji::ConfigBuilder().port(8083).threads(2).build()};
 
-    // 1. Launch the background worker
-    // The server will handle requests while this runs in parallel
-    app.spawn(status_monitor());
+        // The coroutine owns its argument and starts when the engine runs.
+        app.spawn(monitor(ticks));
+        app.get("/", [ticks]() {
+            return moji::Json{{"ticks", ticks->load(std::memory_order_relaxed)}};
+        });
 
-    app.get("/", [](Response& res) -> Async<void> {
-        res.send("The background monitor is running. Check your terminal!");
-        co_return;
-    });
-
-    std::cout << "Background task demo running on :8080" << std::endl;
-    app.init();
-
-    return 0;
+        std::cout << "Background example: http://localhost:8083\n";
+        app.init();
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 }

@@ -1,66 +1,59 @@
-/**
- * Example 06: Middleware Chain
- * 
- * This example demonstrates how to build custom middleware and use the Request Context.
- * Concepts:
- * - Custom middleware with the Next function
- * - Request-scoped data
- * - Request timing
- */
-
 #include <moji/app.h>
-#include <moji/middleware.h>
 
+#include <atomic>
 #include <chrono>
-#include <ctime>
+#include <cstdint>
+#include <exception>
 #include <iostream>
+#include <memory>
 #include <string>
 
-using namespace moji;
-
 int main() {
+    try {
+        moji::App app{moji::ConfigBuilder().port(8082).threads(4).build()};
 
-    auto cfg = moji::ConfigBuilder().threads(8).build();
-    
-    App app{cfg};
-
-    // 1. Custom Timer Middleware
-    app.use([](Request& req, Response& res, Next next) -> Async<void> {
-        auto start = std::chrono::steady_clock::now();
-
-        // Pass control to the next middleware or handler
-        co_await next();
-
-        auto end = std::chrono::steady_clock::now();
-        auto diff = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-        
-        // Add a custom header to the response
-        res.header("X-Response-Time-US", std::to_string(diff));
-        co_return;
-    });
-
-    // 2. Custom Trace ID Middleware
-    app.use([](Request& req, Response& res, Next next) -> Async<void> {
-        // Generate a simple trace ID
-        std::string trace_id = "trace-" + std::to_string(std::time(nullptr));
-        
-        req.set_state("trace_id", trace_id);
-
-        co_await next();
-        co_return;
-    });
-
-    // 3. Handler reading request-scoped data explicitly
-    app.get("/", [](Request& req) -> Async<Json> {
-        auto trace_id = req.state<std::string>("trace_id").value_or("");
-        co_return Json({
-            {"message", "Middleware trace demo"},
-            {"your_trace_id", trace_id}
+        app.use([](moji::Request&, moji::Response& res, moji::Next next)
+                -> moji::Async<void> {
+            const auto start = std::chrono::steady_clock::now();
+            co_await next();
+            const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - start).count();
+            res.header("X-Response-Time-US", std::to_string(elapsed));
         });
-    });
 
-    std::cout << "Middleware demo running on :8080" << std::endl;
-    app.init();
+        auto next_id = std::make_shared<std::atomic<std::uint64_t>>(1);
+        app.use([next_id](moji::Request& req, moji::Response& res, moji::Next next)
+                -> moji::Async<void> {
+            const auto id = next_id->fetch_add(1, std::memory_order_relaxed);
+            req.set_state("trace_id", id);
+            res.header("X-Trace-Id", std::to_string(id));
+            co_await next();
+        });
 
-    return 0;
+        app.get("/", [](const moji::Request& req) {
+            return moji::Json{
+                {"message", "Custom middleware"},
+                {"trace_id", req.state<std::uint64_t>("trace_id").value_or(0)}
+            };
+        });
+
+        // Returning without awaiting next() prevents the handler from running.
+        app.use([](moji::Request& req, moji::Response& res, moji::Next next)
+                -> moji::Async<void> {
+            if (req.path() == "/blocked") {
+                res.forbidden("Stopped by middleware");
+                co_return;
+            }
+            co_await next();
+        });
+        app.get("/blocked", []() {
+            return "This handler is skipped.\n";
+        });
+
+        std::cout << "Middleware example: http://localhost:8082\n";
+        app.init();
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 }

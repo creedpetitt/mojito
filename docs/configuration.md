@@ -1,128 +1,83 @@
-# Configuration Guide
+# Configuration
 
-moji offers a fluent, type-safe API for configuring your application. This guide covers all available settings and best practices for production deployments.
-
----
-
-## The App Builder API
-
-Instead of passing a long list of parameters to a constructor, moji uses a **Fluent Interface** (also known as the Builder pattern) on the `App` class. This allows you to chain configuration methods together.
+`ConfigBuilder` constructs a `Config` value. `App` stores its own immutable copy; changing your original config after constructing the app does not reconfigure the server.
 
 ```cpp
 #include <moji/app.h>
+#include <chrono>
 
-using namespace moji;
+auto config = moji::ConfigBuilder()
+    .port(8080)
+    .threads(4)
+    .execution_model(moji::ExecutionModel::PerWorker)
+    .max_body_size(1024 * 1024)
+    .timeout(std::chrono::seconds(15))
+    .shutdown(std::chrono::seconds(5))
+    .server_name("my-api/1.0")
+    .build();
 
-int main() {
-    App app;
-
-    app.server_name("moji-API/1.0")    // Custom 'Server' HTTP header
-       .max_body_size(10 * 1024 * 1024) // 10MB limit
-       .timeout(30)                     // 30s request timeout
-       .threads(4);                 // Event loop thread count
-
-    app.listen(8080);
-}
+moji::App app{config};
+// Register routes, then app.init().
 ```
 
-### Configuration Options
+## Settings and defaults
 
-| Method | Default | Description |
-| :--- | :--- | :--- |
-| `.server_name(string)` | `"moji/1.0"` | The string sent in the `Server` response header. |
-| `.max_body_size(bytes)` | `10MB` | The maximum size of an HTTP request body. Larger requests return `413 Payload Too Large`. |
-| `.timeout(seconds)` | `30` | The time moji waits for a request to complete before closing the connection. |
-| `.num_threads(int)` | `auto` | Number of CPU threads to use for the event loop. `0` auto-detects based on hardware. |
-| `.shutdown_timeout(sec)`| `30` | Grace period for active connections during server shutdown. |
+| Builder method | Config field/type | Default | Meaning |
+|---|---|---|---|
+| `port(uint16_t)` | `port` | `8080` | TCP listening port |
+| `threads(int)` | `threads` | `1` | Workers, including the thread calling `init()`; must be at least 1 |
+| `execution_model(ExecutionModel)` | `execution_model` | `PerWorker` | Per-worker or shared-context execution |
+| `max_body_size(size_t)` | `max_body_size` | `10 * 1024 * 1024` | HTTP request-body limit in bytes |
+| `timeout(std::chrono::seconds)` | `timeout_seconds` | `30s` | Stream deadline set before each read and TLS handshake |
+| `shutdown(std::chrono::seconds)` | `shutdown_timeout` | `30s` | Deadline for the normal per-connection TLS closing exchange |
+| `server_name(string_view)` | `server_name` / `std::string` | `"mojito/0.1.0"` | `Server` response header |
+| `expose_client_ip(bool)` | `expose_client_ip` | `false` | Attach socket peer address as `"client_ip"` request state |
+| `protocol(NetworkProtocol)` | `protocol` | `HTTP` | Plain HTTP or HTTPS |
+| `certificate_chain_file(string_view)` | `certificate_chain_file` / `std::string` | Empty | PEM certificate-chain file for HTTPS |
+| `private_key_file(string_view)` | `private_key_file` / `std::string` | Empty | Matching PEM private-key file for HTTPS |
 
-> **Note on Static Files**: moji uses zero-copy streaming for all static assets. This means the server does not need a "Cache Size" configuration for file contents, as it leverages the OS Page Cache for maximum performance without memory bloat.
+Calling `expose_client_ip()` without an argument currently supplies `false`; use `expose_client_ip(true)` to enable it.
 
----
+Builder string arguments are copied into owned config strings. Relative certificate/key paths resolve against the process working directory. HTTPS does not automatically select port 443; choose the port explicitly. Port 8443 is convenient for local testing without privileged-port permission.
 
+`build()` returns the config value; most validation/loading occurs when the engine/server is constructed or started. It is not a comprehensive validation API. HTTP ignores the certificate fields; HTTPS rejects empty paths and propagates certificate/key-loading failures.
 
-
-
-You can set the minimum severity level using `.log_level(LogLevel)`. Available levels are:
-*   `LogLevel::DEBUG`: Verbose output for development.
-*   `LogLevel::INFO`: General application flow (Default).
-*   `LogLevel::WARN`: Potential issues that don't stop the app.
-*   `LogLevel::ERROR`: Serious failures and exceptions.
+## Execution models
 
 ```cpp
-app.log_level(LogLevel::DEBUG);
+.execution_model(moji::ExecutionModel::PerWorker)
 ```
 
-### Log Targets
-
-By default, moji logs to `stdout`. In production, you can redirect this to a file.
+Creates one event loop per worker, each run by one thread. Accepted connections are assigned round-robin and stay on that context. Workers are not pinned to CPU cores.
 
 ```cpp
-// Log to a file
-app.log_to("server.log");
+.execution_model(moji::ExecutionModel::SharedContext)
 ```
 
----
+Creates one event loop run by all workers. The listener and individual connections use strands to serialize their operations. A strand is not a dedicated thread.
 
-## Lifecycle & Shutdown
+Both models share the same application router, middleware, and captured application state. Synchronize mutable data accessed from different connections. See [architecture](architecture.md).
 
-moji ensures that your application shuts down cleanly without dropping in-flight requests.
+## Timeouts and shutdown
 
-| Method | Default | Description |
-| :--- | :--- | :--- |
-| `.shutdown_timeout(sec)`| `30` | The maximum time to wait for active requests to finish before force-killing the server. |
+The stream deadline is an I/O deadline, not a preemptive limit on handler CPU time. A blocking handler cannot be interrupted simply because the deadline elapsed. The read deadline is not a separate idle/handler/write configuration; later stream operations use the stream's current deadline.
 
-**Optimized Behavior**: 
-As of v1.1.0, the shutdown process is highly optimized. If your server has zero active connections, it will shut down **instantly** upon receiving a stop signal. The timeout only acts as a safety net for hung requests.
+`shutdown_timeout` bounds TLS shutdown for a connection that reaches its normal close path. It is **not** an application-wide grace period.
 
-While the fluent API is great for code-based config, sensitive data like API keys should stay in `.env` files.
+`App::stop()` stops the contexts immediately, and workers are joined before `init()` returns. In-flight responses are not drained. Pending operations are released when the app is destroyed. Normal per-connection TLS shutdown and application-wide stop are different paths.
+
+## Peer address and application settings
+
+With `expose_client_ip(true)`:
 
 ```cpp
-#include <moji/environment.h>
-
-int main() {
-    moji::load_env(); // Loads from .env in the working directory
-
-    std::string db_url = moji::env("DATABASE_URL");
-    int port = moji::env<int>("PORT", 8080);
-
-    App app;
-    app.listen(port);
-}
+app.get("/peer", [](const moji::Request& req) {
+    return moji::Json{
+        {"peer", req.state<std::string>("client_ip").value_or("")}
+    };
+});
 ```
 
----
+This is the socket's remote address. It does not interpret `Forwarded` or `X-Forwarded-For` headers from a reverse proxy.
 
-## Production Recommendations
-
-For a hardened production setup, we recommend the following pattern:
-
-```cpp
-int main() {
-    App app;
-
-    app.server_name("moji-Prod/1.0")
-       .log_to("production.log")
-       .log_level(LogLevel::INFO)
-       .num_threads(std::thread::hardware_concurrency())
-       .timeout(15)             // Fail fast in high load
-       .max_body_size(1024*1024); // 1MB limit for standard APIs
-
-    app.listen(8080);
-}
-```
-
-
-graph TD
-        subgraph App ["App (State: Configuring)"]
-            Router["router_ (empty)"]
-            MW["middleware_ (empty vector)"]
-            Config["config_ (threads=4, port=8080, etc.)"]
-            Dispatcher["dispatcher_"]
-            Server["server_ (State: Stopped)"]
-        end
-
-        Dispatcher -->|references| Router
-        Dispatcher -->|references| MW
-        Dispatcher -->|references| Config
-        Server -->|references| Dispatcher
-        Server -->|references| Config
+There are no built-in environment-file, log-level, or thread-auto-detection settings. Applications can read environment variables using standard C++ and pass their results to `ConfigBuilder`. The listener currently binds IPv4 on all local interfaces; there is no bind-address builder field.

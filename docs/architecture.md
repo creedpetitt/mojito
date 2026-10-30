@@ -1,90 +1,207 @@
-# Architecture & Design
+# Architecture
 
-moji is engineered for high-concurrency workloads where I/O latency is the primary bottleneck. This guide explores the design patterns and technical choices that make moji unique.
+moji has one application and one listening server. `ExecutionModel` changes how the server runs its Asio event loops; it does not create an independent application/router for each worker.
 
----
+## Ownership
 
-## 1. The Async Core
+```mermaid
+flowchart TD
+    App["App"] --> Config["Immutable Config"]
+    App --> Router["Router and stored handlers"]
+    App --> MW["Middleware vector"]
+    App --> Dispatcher["Dispatcher"]
+    App --> Server["Server"]
+    Server --> Engines["EnginePool"]
+    Server --> Listener["Listener and TCP acceptor"]
+    Server --> Signals["SignalHandler"]
+    Server --> TLS["Optional TLS context"]
+    Engines --> Contexts["io_context objects and work guards"]
+    Contexts -->|"pending coroutine owns"| Session["HttpSession of a concrete stream type"]
+    Dispatcher -.->|"borrows"| Config
+    Dispatcher -.->|"borrows"| Router
+    Dispatcher -.->|"borrows"| MW
+    Server -.->|"borrows"| Dispatcher
+    Session -.->|"borrows"| Config
+    Session -.->|"borrows"| Dispatcher
+```
 
-moji is built on top of **Boost.Asio** and **Coroutines**. Unlike traditional frameworks that use one thread per connection (which wastes memory and CPU), moji uses a small pool of worker threads to handle thousands of connections.
+`App` owns the router, middleware, config, dispatcher, and server. The dispatcher/server/session borrow stable references to those objects. Register routes and middleware before startup; those containers are not mutated while serving requests.
 
-### How it works:
-When a handler reaches a `co_await` point, the current function is suspended and its state is saved. The worker thread is then immediately freed to handle a different request. Once the awaited operation completes, the original function resumes exactly where it left off.
+The listener accepts a socket and constructs a shared session. After `session->run()`, the local shared pointer can disappear: the connection coroutine holds a `shared_ptr` parameter across its suspensions. The listener does not store a collection of sessions.
+
+The SSL context is configured before acceptance begins and reused by TLS streams. Its server member is declared before the engine so engine-owned pending sessions are released before the context is destroyed.
+
+## Per-worker contexts
+
+This is the default, `ExecutionModel::PerWorker`.
+
+```mermaid
+flowchart TB
+    Client["New TCP connection"] --> Listener["One listener and acceptor"]
+    Listener --> Assign["Next accepted socket executor: round-robin"]
+    subgraph W0["Worker 0: thread calling init"]
+        C0["io_context 0"]
+        S0["Connections assigned to context 0"]
+        C0 --> S0
+    end
+    subgraph W1["Worker 1"]
+        C1["io_context 1"]
+        S1["Connections assigned to context 1"]
+        C1 --> S1
+    end
+    subgraph W2["Worker 2"]
+        C2["io_context 2"]
+        S2["Connections assigned to context 2"]
+        C2 --> S2
+    end
+    Assign --> C0
+    Assign --> C1
+    Assign --> C2
+    Listener -.->|"accept callbacks run here"| C0
+    Signals["SIGINT and SIGTERM"] --> C0
+```
+
+For `threads=N`, `EnginePool` owns N contexts, each constructed with the single-thread concurrency hint. The server starts N-1 `jthread` workers and runs worker 0 on the caller's thread. Exactly one thread runs each context; the hint alone is not what enforces that rule.
+
+The acceptor runs on context 0. Each pending accept is given the executor for its next socket, selected round-robin. The accepted socket, TCP stream, optional TLS stream, and session inherit that connection executor.
+
+A connection remains assigned to its context for its lifetime. Strands are unnecessary for these connection operations because only one thread runs the context. This is not OS core pinning or automatic load-based connection migration.
+
+## One shared context
+
+Select `ExecutionModel::SharedContext`.
+
+```mermaid
+flowchart TB
+    T0["Worker 0: caller"] --> IOC["One io_context"]
+    T1["Worker 1"] --> IOC
+    T2["Worker 2"] --> IOC
+    IOC --> LS["Listener strand"]
+    LS --> Listener["One acceptor"]
+    IOC --> AS["Connection A strand"]
+    AS --> A["Session A"]
+    IOC --> BS["Connection B strand"]
+    BS --> B["Session B"]
+    IOC --> BG["Background tasks on the context executor"]
+```
+
+All N threads run the same context. The acceptor has a strand, and each new socket receives a fresh connection strand.
+
+A strand serializes the operations submitted through it, including the stream's composed I/O and timer work. It is not a thread reservation: successive handlers can execute on different workers. It is also not a lock held across a coroutine's suspension. The session's sequential request loop prevents overlapping HTTP work on that connection.
+
+Different connections have different strands. They can concurrently call the same route or middleware. Those strands do not protect shared application data.
+
+| Property | PerWorker | SharedContext |
+|---|---|---|
+| Context count | N | 1 |
+| Threads running each context | 1 | N |
+| Connection executor | Assigned context | Fresh strand on shared context |
+| Acceptor executor | Context 0 | Strand on shared context |
+| Connection migration | None | Handlers can move between worker threads |
+| Shared application state | Must be synchronized | Must be synchronized |
+
+Neither model makes blocking work free. A blocking handler occupies its worker. A shared context can schedule other runnable work on other workers, but cannot move an already executing blocking call elsewhere.
+
+## Connection and request flow
 
 ```mermaid
 sequenceDiagram
-    participant T as Worker Thread
-    participant R1 as Request A (Async I/O)
-    participant R2 as Request B (Simple Static File)
-    
-    T->>R1: Start Handler A
-    R1->>T: co_await I/O (Suspend)
-    Note over T: Thread is now free!
-    T->>R2: Start Handler B
-    R2->>T: Send File & co_return (Finish)
-    Note over T: I/O Ready
-    T->>R1: Resume Handler A
-    R1->>T: Send Result & co_return (Finish)
-```
-
----
-
-## 2. Services And Request Context
-
-moji keeps services explicit. The app owns long-lived shared services, and each request carries a non-owning pointer to that app registry.
-
-### The Service Hierarchy
-1.  **Application Scope**: Services created once at startup.
-2.  **Request Scope**: Objects created or modified during a single HTTP request (e.g., The current User, a Trace ID).
-
-```mermaid
-graph LR
-    subgraph AppContainer [Application Container]
-        Auth[Auth Service]
+    participant Client
+    participant Listener
+    participant Server
+    participant Session as HttpSession
+    participant Dispatcher
+    participant Router
+    participant Middleware
+    participant Handler
+    Client->>Listener: TCP connect
+    Listener->>Server: Accepted socket with assigned executor
+    Server->>Session: Construct plain or TLS stream and call run
+    Note over Session: Connection coroutine retains session ownership
+    opt HTTPS
+        Session->>Client: Await TLS server handshake
     end
-
-    subgraph ReqContext [Request Context]
-        User[Current User]
-        Params[Path Params]
+    loop Each keep-alive request
+        Client->>Session: HTTP bytes
+        Session->>Session: Beast parse, body limit, construct Request
+        Session->>Dispatcher: handle request
+        Dispatcher->>Router: Match method and path
+        Router-->>Dispatcher: Handler and captured parameters, or no match
+        Dispatcher->>Middleware: Await registered chain
+        Middleware->>Handler: Direct sync call or await async call
+        Handler-->>Middleware: Fill response or return value
+        Middleware-->>Dispatcher: Unwind chain
+        Dispatcher-->>Session: Response with framework headers
+        Session->>Client: Await response write
     end
-
-    Auth --> Handler[Route Handler]
-    User --> Handler
-```
----
-
-## 4. Security by Default
-
-moji is designed with a "Secure-by-Default" philosophy:
-*   **Memory Safety**: moji uses RAII and smart pointers throughout. Raw `new` and `delete` are virtually non-existent in the codebase.
-*   **Buffer Safety**: Powered by `boost::beast`, the HTTP parser handles malformed or oversized requests gracefully, preventing common overflow attacks.
-
----
-
-## 5. Lifecycle & Graceful Shutdown
-
-moji ensures that your application shuts down cleanly without dropping in-flight requests.
-
-### The Shutdown Sequence
-1.  **Signal Trap**: The server listens for `SIGINT` (Ctrl+C) and `SIGTERM`.
-2.  **Listener Stop**: The server immediately stops accepting new connections.
-3.  **In-flight Completion**: Existing requests are allowed to finish their execution loop.
-4.  **Safety Timeout**: A configurable `shutdown_timeout` (default 30s) ensures that if a session is hung (e.g., a massive upload or a slow database query), the process eventually force-stops.
-
-```cpp
-app.config().shutdown_timeout = 5; // Allow 5 seconds for cleanup
+    opt Normal TLS connection close
+        Session->>Client: Await TLS shutdown with deadline
+    end
+    Session->>Client: TCP cleanup
 ```
 
----
+`HttpSession<Stream>` shares the HTTP logic between `HttpStream` (`beast::tcp_stream`) and optional `TlsStream` (`beast::ssl_stream<HttpStream>`). Build guards remove SSL includes, context members, branches, and instantiations when TLS is disabled.
 
-## 6. Zero-Copy I/O
+The handshake helper is awaited once per connection. For plain streams it returns immediately. For TLS streams it performs the handshake before any HTTP parsing. Normal TLS shutdown is also per connection, not per request.
 
-moji is designed to be "Memory-Transparent" when handling large assets. This is achieved through a specialized response pipeline that distinguishes between dynamic and static content.
+A new Beast parser, moji request, and moji response are prepared for each request. The session's incoming flat buffer persists, including unread bytes belonging to a later pipelined request. Keep-alive reuses the connection/session, not one immutable request object.
 
-### The Response Pipeline
-When a request is processed, `App::handle_request` returns a `Response` object rather than a raw string. The `HttpSession` then performs an architectural optimization:
+## Handler adaptation and middleware
 
-1.  **Dynamic Content**: If the response contains a body (JSON, HTML), it uses `http::string_body`.
-2.  **Static Assets**: If the response points to a file path (via `res.file()`), moji swaps the body type to `http::file_body`.
+At registration, `App::wrap_handler()` examines the callable's return type using the function traits and `async_result` specialization. It stores either a `SyncHandler` or an `AsyncHandler` in a variant. The dispatcher checks that stored alternative when invoking the matched handler.
 
-This allows the operating system to stream the file directly from the file system to the network interface, bypassing the application's memory space entirely and avoiding expensive data copies.
+Synchronous handlers are called directly; asynchronous handlers are awaited. This distinction is independent of the execution model. All connections still use asynchronous network I/O, and middleware still has an asynchronous `Next` interface.
+
+A `co_await` can suspend when an operation is pending, allowing the worker to run other ready work. It need not suspend if the result is already available. CPU work and blocking APIs remain ordinary work on the current thread.
+
+The router currently performs a linear scan of pre-split registered routes. Middleware runs after lookup and can bypass the selected handler or fallback 404. Exceptions unwind to the dispatcher's error handler; post-`next()` middleware statements are not a finally block.
+
+## Writing responses
+
+The session converts moji's response into a Beast response. For string bodies up to 64 KiB, it collects Beast serializer buffers into the session-owned outgoing string and awaits an Asio write on `stream_`. Files and larger bodies use Beast's normal response-writing path.
+
+This outgoing string is separate from the incoming flat buffer. Its contents are rebuilt for each response; it is not a response cache. Capacity over 128 KiB is released after a buffered write. TLS writes use the SSL stream, not a bypass to the underlying socket.
+
+This design makes some deliberate copies. It is not universally zero-copy, and `file_body` is not by itself a promise of kernel `sendfile` behavior. The [historical investigation](performance-investigation.md) explains the measured reasons for the small-response path.
+
+## Background work and lifetime
+
+`App::spawn(Async<void>)` submits a detached coroutine. The contexts already exist during app construction, so tasks can be submitted before `init()`; they start when workers run.
+
+In per-worker mode, a separate atomic round-robin counter selects the task context. In shared mode, tasks use the shared context's plain executor, not a connection strand. Background work is not automatically attached to whichever request called `spawn()`.
+
+Work guards keep contexts alive even when a worker has no sockets yet. They do not create threads or make work execute before `run()`.
+
+Pass owned values into background coroutines and handle failures inside tasks when they need reporting. Do not retain a request/response reference after the handler completes. Prefer named coroutine functions with value parameters over immediately invoking a temporary capturing coroutine lambda.
+
+## Startup, errors, and stop
+
+`App` progresses through Configuring, Running, Stopping, and Stopped. It publishes Running before listener setup finishes; this is a lifecycle state, not a readiness probe. Repeated startup or route registration after startup is rejected.
+
+| Failure | Current handling |
+|---|---|
+| Invalid worker count | Exception during `App` construction |
+| Bind or certificate load failure | Exception propagates from `init()` after cleanup |
+| Malformed HTTP / invalid target | Session-level 400 where a response can be sent; connection ends |
+| Oversized request body | Session-level 413; connection ends |
+| Handler/middleware `HttpError` | Dispatcher JSON error with its status |
+| Other standard handler/middleware exception | Dispatcher JSON 500 including exception message |
+| Normal disconnect, cancellation, or timeout | Connection ends without another ordinary response |
+| TLS handshake failure | Session boundary catches/logs and cleans up the transport |
+
+SIGINT/SIGTERM run through one signal handler on context 0. `stop()` stops every context, workers are joined, and signal/listener cleanup follows. Responses are not drained; pending operation state is released during app destruction. `shutdown_timeout` bounds normal TLS connection shutdown, not an application-wide drain phase.
+
+The app must outlive its blocking `init()` and concurrent public calls. Both models use the same ownership/lifecycle design; there is no public engine accessor for manually driving internal contexts.
+
+## Implementation entry points
+
+| Area | Source |
+|---|---|
+| Public registration and handler adaptation | [app.h](../include/moji/app.h) |
+| Lifecycle and ownership | [app.cpp](../src/app.cpp) |
+| Context ownership and executor selection | [engine_pool.cpp](../src/engine_pool.cpp) |
+| Listener, worker startup, signals, TLS context | [server.cpp](../src/server.cpp), [listener.cpp](../src/listener.cpp) |
+| Connection coroutine, parsing, writing, TLS handshake/shutdown | [http_session.cpp](../src/http_session.cpp) |
+| Routing and middleware dispatch | [dispatcher.cpp](../src/dispatcher.cpp), [router.cpp](../src/router.cpp) |
+
+For the underlying executor rules, see [Asio's strand documentation](https://www.boost.org/doc/libs/1_85_0/doc/html/boost_asio/overview/core/strands.html).

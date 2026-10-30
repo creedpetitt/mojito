@@ -1,5 +1,7 @@
 # Moji performance investigation: from profiling to 300k observations
 
+> Historical investigation: measurements and command examples describe the fixtures at the time of the experiments. Current educational examples have been simplified. Use the [build guide](build-system.md) and [examples guide](../examples/README.md) for current commands; these measurements are not HTTPS or cross-platform guarantees.
+
 This records the investigation of Moji's HTTP/1.1 hello-world request path: what
 we measured, what the profiles showed, which changes were retained, and which
 experiment we rejected. It follows the implementation through the later native

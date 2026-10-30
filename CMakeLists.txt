@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 project(moji VERSION 1.0.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -15,6 +15,7 @@ endif()
 option(
   moji_INSTALL "Generate install rules for moji" ${moji_DEFAULT_INSTALL})
 option(moji_ENABLE_TLS "Enable OpenSSL dependencies for HTTPS support" OFF)
+option(moji_BUILD_EXAMPLES "Build the educational example applications" OFF)
 
 moji_setup_boost()
 find_package(Threads REQUIRED)
@@ -57,6 +58,10 @@ target_compile_definitions(moji_core PRIVATE
 if(moji_ENABLE_TLS)
   find_package(OpenSSL REQUIRED COMPONENTS SSL)
   target_link_libraries(moji_core PRIVATE OpenSSL::SSL)
+endif()
+
+if(moji_BUILD_EXAMPLES)
+  add_subdirectory(examples)
 endif()
 
 if(moji_INSTALL)
