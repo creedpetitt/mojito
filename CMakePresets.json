@@ -1,0 +1,68 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "moji_FETCH_BOOST": "ON",
+        "moji_ENABLE_TLS": "OFF"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "vcpkg-debug",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build/vcpkg-debug",
+      "cacheVariables": {
+        "moji_FETCH_BOOST": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_MANIFEST_DIR": "${sourceDir}/vcpkg",
+        "VCPKG_MANIFEST_FEATURES": ""
+      }
+    },
+    {
+      "name": "vcpkg-release",
+      "inherits": "vcpkg-debug",
+      "binaryDir": "${sourceDir}/build/vcpkg-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "vcpkg-debug-tls",
+      "inherits": "vcpkg-debug",
+      "binaryDir": "${sourceDir}/build/vcpkg-debug-tls",
+      "cacheVariables": {
+        "moji_ENABLE_TLS": "ON",
+        "VCPKG_MANIFEST_FEATURES": "tls"
+      }
+    },
+    {
+      "name": "vcpkg-release-tls",
+      "inherits": "vcpkg-debug-tls",
+      "binaryDir": "${sourceDir}/build/vcpkg-release-tls",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "vcpkg-debug", "configurePreset": "vcpkg-debug" },
+    { "name": "vcpkg-release", "configurePreset": "vcpkg-release" },
+    { "name": "vcpkg-debug-tls", "configurePreset": "vcpkg-debug-tls" },
+    { "name": "vcpkg-release-tls", "configurePreset": "vcpkg-release-tls" }
+  ]
+}

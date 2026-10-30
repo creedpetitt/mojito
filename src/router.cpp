@@ -1,0 +1,121 @@
+#include <moji/router.h>
+
+#include "url.h"
+
+#include <utility>
+
+namespace moji {
+
+namespace {
+
+std::string_view path_without_query(std::string_view target) {
+    const size_t query_pos = target.find('?');
+    auto path = target.substr(0, query_pos);
+
+    if (path.size() > 1 && path.back() == '/') {
+        path.remove_suffix(1);
+    }
+
+    return path;
+}
+
+std::vector<std::string_view> split_view(std::string_view path) {
+    std::vector<std::string_view> segments;
+    if (path.empty() || path == "/") {
+        segments.emplace_back("");
+        return segments;
+    }
+
+    size_t start = 0;
+    while (start < path.size()) {
+        if (path[start] == '/') {
+            ++start;
+            continue;
+        }
+
+        size_t end = path.find('/', start);
+        if (end == std::string_view::npos) {
+            end = path.size();
+        }
+
+        segments.push_back(path.substr(start, end - start));
+        start = end;
+    }
+
+    if (segments.empty()) {
+        segments.emplace_back("");
+    }
+
+    return segments;
+}
+
+std::vector<std::string> split(const std::string_view path) {
+    const auto views = split_view(path);
+    std::vector<std::string> segments;
+    segments.reserve(views.size());
+
+    for (auto segment : views) {
+        segments.emplace_back(segment);
+    }
+
+    return segments;
+}
+
+bool match_segments(
+    const std::vector<std::string>& route_segments,
+    const std::vector<std::string_view>& request_segments,
+    std::unordered_map<std::string, std::string>& params) {
+        
+    for (size_t i = 0; i < route_segments.size(); ++i) {
+        const std::string& route_segment = route_segments[i];
+        const std::string_view request_segment = request_segments[i];
+
+        if (!route_segment.empty() && route_segment.front() == ':') {
+            const std::string name = route_segment.substr(1);
+            params[name] = detail::decode_path_segment(request_segment);
+            continue;
+        }
+
+        if (route_segment != request_segment) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+} // namespace
+ 
+void Router::add_route(
+    const std::string_view method, 
+    const std::string& path, Handler handler) {
+        
+    routes_.push_back({
+        std::string(method),
+        path,
+        split(path),
+        std::move(handler)
+    });
+}
+
+std::optional<MatchedRoute> Router::match(
+    const std::string_view method,
+    const std::string_view path) const {
+        
+    const auto request_path = path_without_query(path);
+    const auto request_segments = split_view(request_path);
+
+    for (const auto& route : routes_) {
+        if (route.method != method) continue;
+        if (route.segments.size() != request_segments.size()) continue;
+
+        std::unordered_map<std::string, std::string> params;
+        if (match_segments(route.segments, request_segments, params)) {
+            return MatchedRoute{&route.handler, std::move(params)};
+        }
+    }
+
+    return std::nullopt;
+}
+
+} // namespace moji

@@ -1,0 +1,8 @@
+CompileFlags:
+  CompilationDatabase: build/vcpkg-release
+  Add: [-std=c++23]
+---
+If:
+  PathMatch: examples/.*
+CompileFlags:
+  Add: [-std=c++23, -I../include]

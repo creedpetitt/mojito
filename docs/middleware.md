@@ -1,172 +1,77 @@
-# Middleware & Security
+# Custom middleware
 
-Middleware is a powerful way to extend Blaze. It allows you to run code for every request, either before it reaches your route handler or after it finishes.
-
----
-
-## 1. The "Onion" Model
-
-Think of your application like an onion. Each middleware is a layer that "wraps" the inner layers and the core (your route handler).
-
-1.  **Incoming Request**: Passes through Middleware A -> Middleware B -> Your Handler.
-2.  **Outgoing Response**: Passes back through Your Handler -> Middleware B -> Middleware A.
+Middleware runs around the selected route handler. Register it before `app.init()`:
 
 ```cpp
-app.use([](Request& req, Response& res, Next next) -> Async<void> {
-    // 1. Code here runs BEFORE the handler
-    auto start = std::chrono::steady_clock::now();
-
-    co_await next(); // 2. Pass control to the next layer
-
-    // 3. Code here runs AFTER the handler finishes
-    auto end = std::chrono::steady_clock::now();
-    std::cout << "Request took: " << duration(start, end) << "ms" << std::endl;
-    co_return;
+app.use([](moji::Request& req, moji::Response& res, moji::Next next)
+        -> moji::Async<void> {
+    res.header("X-Service", "my-api");
+    co_await next();
 });
 ```
 
----
+`Next` is a callable returning `Async<void>`. Await it to run the next middleware or final handler. Simply calling `next()` creates an awaitable and does not execute that coroutine.
 
-## 2. Global Middleware
+## Ordering
 
-Register middleware that applies to your entire application using `app.use()`.
+For middleware A registered before B:
 
-```cpp
-app.use(middleware::logger());      // Logs every request
-app.use(middleware::cors());        // Enables Cross-Origin Resource Sharing
-app.use(middleware::static_files("public")); // Serves assets from the 'public' folder
+```text
+A before → B before → handler → B after → A after
 ```
 
----
+```cpp
+#include <chrono>
 
-## 3. Passing Data (`Request Context`)
+app.use([](moji::Request&, moji::Response& res, moji::Next next)
+        -> moji::Async<void> {
+    const auto start = std::chrono::steady_clock::now();
+    co_await next();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now() - start).count();
+    res.header("X-Response-Time-US", std::to_string(elapsed));
+});
+```
 
-Middleware often generates data that your routes need (like a User ID or a Trace ID). Blaze provides two ways to pass this data:
+Code after `co_await next()` runs on normal completion. If a downstream function throws, it is skipped unless you handle that exception. The dispatcher's outer error handler converts HTTP/standard exceptions into error responses.
 
-### Type-Safe Context (`Context<T>`)
-Blaze uses a **Type-Based** injection system. To use injection, you must store data using the C++ type as the key.
+Middleware is global and also runs for the fallback 404 handler. Route lookup occurs first; middleware does not automatically trigger rematching if it changes request data.
+
+## Stop the chain
+
+Return without awaiting `next()` to bypass the remaining middleware and handler:
 
 ```cpp
-// 1. Define a unique struct for your data
-struct RequestTrace {
-    std::string id;
-};
+app.use([](moji::Request& req, moji::Response& res, moji::Next next)
+        -> moji::Async<void> {
+    if (req.get_header("X-Demo-Token") != "example") {
+        res.unauthorized("Missing demo token");
+        co_return;
+    }
+    co_await next();
+});
+```
 
-// 2. In Middleware (Set by Type)
-app.use([](Request& req, Response& res, Next next) -> Async<void> {
-    // This stores the object using RequestTrace as the key
-    req.set(RequestTrace{"uuid-123"});
+This illustrates control flow, not a complete authentication scheme. Middleware must await and complete its downstream call before returning; do not detach `next()`, invoke it concurrently, or retain it beyond the request.
+
+## Pass request-local data
+
+```cpp
+app.use([](moji::Request& req, moji::Response&, moji::Next next)
+        -> moji::Async<void> {
+    req.set_state("source", std::string("middleware"));
     co_await next();
 });
 
-// 3. In Route Handler (Magic Injection)
-app.get("/", [](Context<RequestTrace> trace) {
-    // 'trace' acts like RequestTrace*
-    std::cout << "Trace: " << trace->id << std::endl;
+app.get("/", [](const moji::Request& req) {
+    return moji::Json{
+        {"source", req.state<std::string>("source").value_or("unknown")}
+    };
 });
 ```
 
-### Key-Value Context
-If you prefer manual control or simple string keys, you can set and get values manually. Note that these **cannot** be injected via `Context<T>`.
+State lookup uses the stored C++ type as well as the string key. Request-local state is separate from data captured by middleware.
 
-```cpp
-// Set
-req.set("session_id", "abc-123");
+The same middleware callable may be invoked by multiple connections concurrently in either execution model. Mutable captured state needs synchronization. A connection strand protects operations on that connection, not all calls to your middleware across the application.
 
-// Get
-std::string session = req.get<std::string>("session_id");
-```
-
-### User Identity & `is_authenticated()`
-Blaze features a built-in identity system for tracking authenticated users. This is a "Producer/Consumer" model:
-
-1.  **The Producer**: Middleware (like `jwt_auth`) validates credentials and attaches an identity to the request via `req.set_user(json_payload)`.
-2.  **The Consumer**: Your route handlers check if a user is present and access their data.
-
-```cpp
-app.get("/profile", [](Request& req) -> Async<Json> {
-    // 1. Check if the user is logged in
-    if (!req.is_authenticated()) {
-        throw Unauthorized("You must be logged in to view this page");
-    }
-
-    // 2. Access the user data (from the JWT payload)
-    Json user = req.user();
-    std::cout << "Viewing profile for: " << user["email"] << std::endl;
-
-    co_return user;
-});
-```
-
----
-
-## 4. Built-in Security
-
-### JWT Authentication
-Blaze includes a built-in JWT validator that uses **constant-time (timing-safe)** string comparisons to prevent side-channel attacks. It automatically checks the `Authorization: Bearer <token>` header.
-
-**Behavior:**
-*   **Success**: If the token is valid, it extracts the payload, calls `req.set_user()`, and sets `req.is_authenticated()` to **true**.
-*   **Missing/Invalid**: It allows the request to continue (so you can have optional auth), but `req.is_authenticated()` will be **false**.
-
-```cpp
-// Protect your routes with a secret key
-app.use(middleware::jwt_auth("your-secret-key"));
-```
-
-### Rate Limiting
-Protect your API from abuse by limiting the number of requests per IP address.
-
-```cpp
-// Allow 100 requests per 60 seconds per IP
-app.use(middleware::rate_limit(100, 60));
-```
-
-### Zero-Copy File Streaming
-The `static_files` middleware uses high-performance **Zero-Copy Streaming**. Unlike traditional frameworks that read a file into a memory buffer before sending it, Blaze uses `boost::beast::http::file_body`.
-
-**Benefits:**
-*   **Zero RAM Overhead**: Whether you serve a 1KB icon or a 10GB video, Blaze consumes virtually no additional memory.
-*   **Kernel-Level Efficiency**: The OS handles the data transfer directly from the disk cache to the network socket.
-*   **Automatic MIME Detection**: Blaze automatically detects and caches MIME types for all common web formats.
-
-```cpp
-app.use(middleware::static_files("public"));
-```
-
----
-
-## 5. Crypto & Password Utilities
-
-Security isn't just about middleware; it's about how you handle data. Blaze includes a `blaze::crypto` namespace for common security tasks.
-
-### Password Hashing
-Never store passwords in plain text. Blaze provides a built-in hashing utility that uses **SCRYPT**, a memory-hard algorithm designed to be resistant to hardware (ASIC/GPU) brute-force attacks.
-
-```cpp
-#include <blaze/crypto.h>
-
-// 1. Hash a password during signup
-// Automatically handles salting and work-factor tuning
-std::string hash = blaze::crypto::hash_password("user_password");
-
-// 2. Verify during login (Timing-safe)
-bool ok = blaze::crypto::verify_password("user_password", hash);
-```
-
-### Manual JWT Management
-While `jwt_auth` middleware handles verification, you need to sign tokens yourself when a user logs in.
-
-```cpp
-// Generate a token that expires in 1 hour (3600s)
-Json payload = {{"user_id", 123}, {"role", "admin"}};
-std::string token = blaze::crypto::jwt_sign(payload, "your-secret-key", 3600);
-
-// Return it to the client
-res.json({{"token", token}});
-```
-
-### Core Cryptography
-*   **`sha256(data)`**: Returns a hex-encoded SHA256 hash.
-*   **`random_token(length)`**: Generates a secure random string (perfect for API keys or session IDs).
-*   **`base64_encode/decode`**: Standard base64 and base64url support.
+There are currently no built-in CORS, rate-limit, authentication, or static-directory middleware factories. They can be written using `app.use()`; a small built-in collection is planned. See [the middleware example](../examples/README.md) and [roadmap](roadmap.md).

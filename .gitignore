@@ -9,15 +9,21 @@ build_asan
 *.swp
 *.swo
 *~
+compile_commands.json
+.clangd/
 
 logs/
 
 .DS_Store
 Thumbs.db
-/json.hpp
 *.pem
 
-/blaze-cypto/
-/cli/blaze-linux-amd64
-/cli/blaze-darwin-arm64
-/cli/blaze-darwin-amd64
+
+.cache/neocmakelsp/tree_cmake_map_cache.json
+.cache/neocmakelsp/project_completions_cache.json
+.cache/neocmakelsp/tree_map_cache.json
+.cache/neocmakelsp/project_jumpitems_cache.json
+
+skills/
+bench/
+examples/02_https/certs/

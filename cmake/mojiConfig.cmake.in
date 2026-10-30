@@ -1,0 +1,16 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
+# Bundled builds export their own moji::boost_* targets. Package builds need
+# the consumer's Boost installation, including static-library link dependencies.
+if(NOT @moji_FETCH_BOOST@)
+    find_dependency(Boost 1.85 CONFIG COMPONENTS headers system json url)
+endif()
+
+if(@moji_ENABLE_TLS@)
+    find_dependency(OpenSSL COMPONENTS SSL)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/mojiTargets.cmake")

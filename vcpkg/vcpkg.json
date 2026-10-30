@@ -1,0 +1,15 @@
+{
+  "name": "mojito",
+  "version": "0.1.0",
+  "dependencies": [
+    "boost-beast",
+    "boost-json",
+    "boost-url"
+  ],
+  "features": {
+    "tls": {
+      "description": "OpenSSL dependencies for HTTPS support",
+      "dependencies": ["openssl"]
+    }
+  }
+}
